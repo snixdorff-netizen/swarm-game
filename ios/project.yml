@@ -1,0 +1,34 @@
+name: SWARM
+options:
+  bundleIdPrefix: ai.swarm
+  deploymentTarget:
+    iOS: "16.0"
+  createIntermediateGroups: true
+settings:
+  base:
+    MARKETING_VERSION: "1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    SWIFT_VERSION: "5.0"
+    DEVELOPMENT_TEAM: ""
+    CODE_SIGN_STYLE: Automatic
+targets:
+  SWARM:
+    type: application
+    platform: iOS
+    sources:
+      - path: SWARM
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: ai.swarm.game
+        PRODUCT_NAME: SWARM
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+    info:
+      path: SWARM/Resources/Info.generated.plist
+      properties:
+        CFBundleDisplayName: SWARM
+        UILaunchScreen: {}
+        UIStatusBarHidden: true
+        UIRequiresFullScreen: true
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait

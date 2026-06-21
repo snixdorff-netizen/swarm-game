@@ -1,0 +1,5 @@
+ios/SWARM.xcodeproj/
+DerivedData/
+build/
+.DS_Store
+*.xcuserstate
