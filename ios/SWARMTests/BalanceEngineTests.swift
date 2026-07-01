@@ -38,6 +38,20 @@ final class BalanceEngineTests: XCTestCase {
         XCTAssertNil(BalanceEngine.milestoneBanner(for: 45))
     }
 
+    func testBossTeaseAndKillStreakBanners() {
+        XCTAssertEqual(BalanceEngine.bossTeaseBanner(), "BOSS IN 15 SECONDS")
+        XCTAssertEqual(BalanceEngine.killStreakBanner(for: 25), "25 KILLS — ON FIRE")
+        XCTAssertEqual(BalanceEngine.killStreakBanner(for: 50), "50 KILLS — UNSTOPPABLE")
+        XCTAssertNil(BalanceEngine.killStreakBanner(for: 24))
+    }
+
+    func testNextGoalHintGuidesCasualPlayers() {
+        XCTAssertEqual(BalanceEngine.nextGoalHint(timeSec: 10, kills: 0), "Goal: survive 0:30")
+        XCTAssertEqual(BalanceEngine.nextGoalHint(timeSec: 45, kills: 5), "Goal: reach 1:00")
+        XCTAssertEqual(BalanceEngine.nextGoalHint(timeSec: 80, kills: 10), "Goal: boss at 1:30")
+        XCTAssertEqual(BalanceEngine.nextGoalHint(timeSec: 95, kills: 30), "Goal: 50-kill streak")
+    }
+
     func testBossSpawnAtNinety() {
         XCTAssertEqual(Int(BalanceEngine.bossSpawnSeconds), 90)
     }

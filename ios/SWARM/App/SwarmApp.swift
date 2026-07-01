@@ -49,6 +49,9 @@ struct GameRootView: View {
             case .meta: MetaOverlay(model: model)
             case .settings: SettingsOverlay(model: model)
             case .playing:
+                if let hint = model.nextGoalHint {
+                    PlayingHUDOverlay(hint: hint)
+                }
                 if let banner = model.runBanner {
                     RunBannerOverlay(text: banner)
                 }

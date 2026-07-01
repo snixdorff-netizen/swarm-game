@@ -41,6 +41,8 @@ final class RunSimulatorTests: XCTestCase {
         XCTAssertTrue(mortal.died || mortal.survivalSec < immortal.survivalSec)
         XCTAssertFalse(immortal.died)
         XCTAssertEqual(immortal.survivalSec, RunSimulator.defaultMaxSeconds)
+        XCTAssertTrue(immortal.bossReached)
+        XCTAssertEqual(immortal.mode, "immortalQA")
         XCTAssertGreaterThan(immortal.kills, mortal.kills)
     }
 
@@ -60,14 +62,26 @@ final class RunSimulatorTests: XCTestCase {
         XCTAssertEqual(none, 0)
     }
 
-    func testExportMetricsToScratch() throws {
-        let runs = RunSimulator.batchSimulate(count: 5, baseSeed: 42, mode: .mortal())
-        let url = try SimulationMetricsExporter.export(runs)
+    func testExportRepresentativeBatchToScratch() throws {
+        let url = try SimulationMetricsExporter.exportRepresentativeBatch()
         XCTAssertTrue(FileManager.default.fileExists(atPath: url.path))
         let decoded = try JSONDecoder().decode([RunMetrics].self, from: Data(contentsOf: url))
-        XCTAssertEqual(decoded.count, 5)
-        XCTAssertTrue(decoded.contains(where: \.died))
-        XCTAssertTrue(Set(decoded.map(\.survivalSec)).count > 1, "Exported metrics must show survival spread")
+        XCTAssertGreaterThanOrEqual(decoded.count, 12)
+        let profiles = Set(decoded.map(\.profile))
+        XCTAssertTrue(profiles.contains(BuildProfile.baseline.rawValue))
+        XCTAssertTrue(profiles.contains(BuildProfile.novaRush.rawValue))
+        XCTAssertTrue(profiles.contains(BuildProfile.leechTank.rawValue))
+        XCTAssertTrue(profiles.contains(BuildProfile.chainArc.rawValue))
+        XCTAssertTrue(profiles.contains(BuildProfile.metaBoosted.rawValue))
+        XCTAssertTrue(decoded.contains(where: { $0.bossReached }))
+        XCTAssertTrue(decoded.contains(where: { $0.metaLevels > 0 }))
+        XCTAssertTrue(decoded.contains(where: { $0.mode == "immortalQA" && $0.survivalSec >= 60 }))
+        XCTAssertTrue(decoded.contains(where: { $0.mode == "mortal" && $0.died }))
+        let mortal = decoded.filter { $0.mode == "mortal" }
+        XCTAssertGreaterThan(Set(mortal.map(\.survivalSec)).count, 1, "Mortal profiles must spread survival")
+        let leechMedian = RunSimulator.medianSurvival(decoded.filter { $0.profile == BuildProfile.leechTank.rawValue && $0.mode == "mortal" })
+        let baseMedian = RunSimulator.medianSurvival(decoded.filter { $0.profile == BuildProfile.baseline.rawValue && $0.mode == "mortal" })
+        XCTAssertGreaterThan(leechMedian, baseMedian)
     }
 
     func testBuildStateDPSIncreasesWithUpgrades() {

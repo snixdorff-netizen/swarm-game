@@ -108,6 +108,7 @@ final class GameScene: SKScene {
     private var xpMult: CGFloat = 1
     private var leechPerKill: CGFloat = 0
     private var hitMilestones: Set<Int> = []
+    private var hitKillStreaks: Set<Int> = []
 
     // World
     private var enemies: [Enemy] = []
@@ -278,6 +279,7 @@ final class GameScene: SKScene {
         xpMult = meta?.xpMult ?? 1
         leechPerKill = meta?.leechPerKill ?? 0
         hitMilestones.removeAll()
+        hitKillStreaks.removeAll()
         novaRing.path = CGPath(ellipseIn: CGRect(x: -novaRadius, y: -novaRadius, width: novaRadius*2, height: novaRadius*2), transform: nil)
         level = 1; xp = 0; xpToNext = BalanceEngine.initialXpToNext(); runTime = 0; kills = 0; spawnTimer = 0
         pPos = .zero; player.position = .zero; player.zRotation = 0
@@ -375,12 +377,30 @@ final class GameScene: SKScene {
     }
 
     private func checkMilestones(_ sec: Int) {
+        if sec == BalanceEngine.bossTeaseSeconds, !hitMilestones.contains(sec) {
+            hitMilestones.insert(sec)
+            showRunBanner(BalanceEngine.bossTeaseBanner(), pulse: true)
+        }
         guard BalanceEngine.milestoneSeconds.contains(sec), !hitMilestones.contains(sec) else { return }
         hitMilestones.insert(sec)
         guard let banner = BalanceEngine.milestoneBanner(for: sec) else { return }
+        showRunBanner(banner, pulse: true)
+    }
+
+    private func checkKillStreak(_ totalKills: Int) {
+        guard BalanceEngine.killStreakThresholds.contains(totalKills),
+              !hitKillStreaks.contains(totalKills),
+              let banner = BalanceEngine.killStreakBanner(for: totalKills) else { return }
+        hitKillStreaks.insert(totalKills)
+        showRunBanner(banner, pulse: true)
+        SfxPlayer.shared.levelUp()
+        Haptics.shared.kill()
+    }
+
+    private func showRunBanner(_ banner: String, pulse: Bool = false, duration: TimeInterval = 2.8) {
         model?.runBanner = banner
-        pulseMilestone(banner)
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2.8) { [weak self] in
+        if pulse { pulseMilestone(banner) }
+        DispatchQueue.main.asyncAfter(deadline: .now() + duration) { [weak self] in
             if self?.model?.runBanner == banner { self?.model?.runBanner = nil }
         }
     }
@@ -684,6 +704,7 @@ final class GameScene: SKScene {
         e.node.removeFromParent()
         if let idx = enemies.firstIndex(where: { $0 === e }) { enemies.remove(at: idx) }
         kills += 1; model?.kills = kills
+        checkKillStreak(kills)
         let leech = CGFloat(leechLevel) * 2 + leechPerKill
         if leech > 0 { hp = min(maxHp, hp + leech) }
         SfxPlayer.shared.kill(); Haptics.shared.kill()
@@ -796,7 +817,9 @@ final class GameScene: SKScene {
     private func publishHUD() {
         model?.hp = max(0, Int(hp)); model?.maxHp = Int(maxHp)
         model?.xp = xp; model?.xpToNext = xpToNext
-        timeLabel.text = String(format: "%d:%02d", Int(runTime)/60, Int(runTime)%60)
+        let sec = Int(runTime)
+        model?.nextGoalHint = BalanceEngine.nextGoalHint(timeSec: sec, kills: kills)
+        timeLabel.text = String(format: "%d:%02d", sec / 60, sec % 60)
         killLabel.text = "\(kills) kills"
         lvlLabel.text = "LV \(level)"
         layoutHUD()
@@ -828,6 +851,102 @@ final class GameScene: SKScene {
 
     override func didChangeSize(_ oldSize: CGSize) {
         if cam.parent != nil { layoutHUD() }
+    }
+}
+
+// MARK: - Testing harness (drives shipped update/combat/die path in unit tests)
+
+extension GameScene {
+    var qaAutopilotImmune: Bool {
+        get { autoDrive }
+        set { autoDrive = newValue }
+    }
+
+    var testingHp: CGFloat { hp }
+    var testingRunTime: CGFloat { runTime }
+    var testingBossSpawned: Bool { bossSpawned }
+    var testingEnemyCount: Int { enemies.count }
+    var testingKills: Int { kills }
+    var testingLevel: Int { level }
+
+    func testing_attach(to view: SKView) {
+        scaleMode = .resizeFill
+        if view.scene !== self { view.presentScene(self) }
+    }
+
+    func testing_resolveLevelUpIfNeeded() {
+        guard model?.phase == .levelUp else { return }
+        if let id = model?.choices.first?.id {
+            applyUpgrade(id)
+        } else {
+            model?.phase = .playing
+        }
+    }
+
+    func testing_step(at time: TimeInterval) {
+        update(time)
+        testing_resolveLevelUpIfNeeded()
+    }
+
+    func testing_suppressOffense() {
+        boltInterval = 999
+        boltDmg = 0
+        novaLevel = 0
+        chainLevel = 0
+        orbitLevel = 0
+    }
+
+    func testing_placeEnemyOnPlayer(kind: EnemyKind, runTime: CGFloat = 20) {
+        let stats = BalanceEngine.enemyStats(kind: kind, runTime: runTime)
+        let sz: CGFloat = kind == .boss ? 64 : 22
+        let color: SKColor = {
+            switch kind {
+            case .fast: return C.fast
+            case .tank: return C.tank
+            case .shooter: return C.shooter
+            case .boss: return C.boss
+            default: return C.basic
+            }
+        }()
+        let node = SKSpriteNode(color: color, size: CGSize(width: sz, height: sz))
+        node.position = pPos
+        node.zPosition = 2
+        addChild(node)
+        enemies.append(Enemy(node: node, hp: stats.hp, speed: stats.speed, radius: stats.radius,
+                           dmg: stats.damage, xp: stats.xp, kind: kind.rawValue))
+    }
+
+    func testing_placeEnemyShotOnPlayer(damage: CGFloat) {
+        let node = SKSpriteNode(color: C.shooter, size: CGSize(width: 10, height: 10))
+        node.position = pPos
+        node.zPosition = 3
+        addChild(node)
+        enemyShots.append(EnemyShot(node: node, vel: .zero, dmg: damage, life: 2))
+    }
+
+    func testing_fastForward(seconds: CGFloat, step: TimeInterval = 1.0 / 60.0, maxSteps: Int = 12_000) {
+        var t = lastTime == 0 ? 0 : lastTime
+        var steps = 0
+        while runTime < seconds, model?.phase == .playing, steps < maxSteps {
+            t += step
+            update(t)
+            testing_resolveLevelUpIfNeeded()
+            steps += 1
+        }
+    }
+
+    func testing_captureSummary() -> GameSceneRunSummary {
+        GameSceneRunSummary(
+            survivalSec: Int(runTime.rounded(.down)),
+            kills: kills,
+            level: level,
+            died: model?.phase == .dead,
+            bossSpawned: bossSpawned,
+            milestone30: hitMilestones.contains(30),
+            milestone60: hitMilestones.contains(60),
+            finalHp: max(0, Int(hp)),
+            qaAutopilotImmune: autoDrive
+        )
     }
 }
 

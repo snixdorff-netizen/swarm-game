@@ -10,6 +10,9 @@ struct RunMetrics: Codable, Equatable {
     let level: Int
     let seed: UInt64
     let died: Bool
+    let bossReached: Bool
+    let mode: String
+    let metaLevels: Int
 }
 
 enum SimulationMode: Equatable {
@@ -64,7 +67,17 @@ enum RunSimulator {
         var enemyCount = 6
         var spawnTimer: CGFloat = 0
         var bossSpawned = false
+        var bossReached = false
         var died = false
+        let modeLabel: String = {
+            switch mode {
+            case .immortalQA: return "immortalQA"
+            case .mortal: return "mortal"
+            }
+        }()
+        let metaLevels = meta.map { store in
+            MetaCatalog.all.reduce(0) { $0 + store.level(for: $1.id) }
+        } ?? 0
 
         while time < CGFloat(maxSeconds) && hp > 0 {
             let dt: CGFloat = 1.0
@@ -76,6 +89,7 @@ enum RunSimulator {
             }
             if !bossSpawned && time >= BalanceEngine.bossSpawnSeconds {
                 bossSpawned = true
+                bossReached = true
                 enemyCount = min(BalanceEngine.maxEnemies, enemyCount + 1)
             }
 
@@ -130,8 +144,33 @@ enum RunSimulator {
             kills: kills,
             level: level,
             seed: seed,
-            died: died
+            died: died,
+            bossReached: bossReached,
+            mode: modeLabel,
+            metaLevels: metaLevels
         )
+    }
+
+    /// Representative batch for engagement verification: all profiles + meta + boss path.
+    static func representativeBatch() -> [RunMetrics] {
+        var runs: [RunMetrics] = []
+        for (profileIndex, profile) in BuildProfile.allCases.enumerated() {
+            for i in 0..<2 {
+                let seed = UInt64(5000 + i * 31 + profileIndex)
+                runs.append(simulate(profile: profile, seed: seed, mode: .mortal()))
+            }
+        }
+        let suite = "swarm-sim-meta-\(ProcessInfo.processInfo.processIdentifier)"
+        let ud = UserDefaults(suiteName: suite)!
+        ud.removePersistentDomain(forName: suite)
+        let meta = MetaStore(defaults: ud)
+        meta.awardRun(kills: 600, timeSec: 500)
+        for up in MetaCatalog.all where meta.canBuy(up) { _ = meta.buy(up) }
+        runs.append(simulate(profile: .baseline, seed: 8080, meta: meta, mode: .mortal()))
+        runs.append(simulate(profile: .leechTank, seed: 8081, meta: meta, mode: .mortal()))
+        runs.append(simulate(profile: .novaRush, seed: 9090, maxSeconds: 120, mode: .immortalQA))
+        runs.append(simulate(profile: .chainArc, seed: 9091, maxSeconds: 120, mode: .immortalQA))
+        return runs
     }
 
     static func batchSimulate(
@@ -184,6 +223,11 @@ struct SeededRNG {
 
 enum SimulationMetricsExporter {
     static let goalScratch = "/var/folders/jc/vlt38jc172b76pd4lmy9ch340000gn/T/grok-goal-a3a70e15315e/implementer"
+
+    @discardableResult
+    static func exportRepresentativeBatch(filename: String = "sim-metrics.json") throws -> URL {
+        try export(RunSimulator.representativeBatch(), filename: filename)
+    }
 
     static func export(_ runs: [RunMetrics], filename: String = "sim-metrics.json") throws -> URL {
         let dir = URL(fileURLWithPath: goalScratch, isDirectory: true)

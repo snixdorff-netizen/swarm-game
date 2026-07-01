@@ -16,8 +16,10 @@ struct EnemyStatBlock {
 
 enum BalanceEngine {
     static let bossSpawnSeconds: CGFloat = 90
+    static let bossTeaseSeconds: Int = 75
     static let maxEnemies = 130
     static let milestoneSeconds: [Int] = [30, 60]
+    static let killStreakThresholds: [Int] = [25, 50, 100]
 
     static func spawnInterval(runTime: CGFloat) -> CGFloat {
         max(0.12, 0.5 - runTime * 0.005)
@@ -41,7 +43,7 @@ enum BalanceEngine {
 
     static func enemyStats(kind: EnemyKind, runTime: CGFloat) -> EnemyStatBlock {
         let scale = difficultyScale(runTime: runTime)
-        let dmgScale = 1 + runTime * 0.004
+        let dmgScale = 1 + runTime * 0.0035
         switch kind {
         case .basic:
             return EnemyStatBlock(hp: 18 * scale, speed: 52, radius: 12, damage: 8 * dmgScale, xp: 1)
@@ -68,6 +70,27 @@ enum BalanceEngine {
         case 60: return "1 MINUTE — HORDE RISING"
         default: return nil
         }
+    }
+
+    static func bossTeaseBanner() -> String { "BOSS IN 15 SECONDS" }
+
+    static func killStreakBanner(for kills: Int) -> String? {
+        switch kills {
+        case 25: return "25 KILLS — ON FIRE"
+        case 50: return "50 KILLS — UNSTOPPABLE"
+        case 100: return "100 KILLS — SWARM SLAYER"
+        default: return nil
+        }
+    }
+
+    /// Casual-friendly hint for the in-run HUD (what to chase next).
+    static func nextGoalHint(timeSec: Int, kills: Int) -> String {
+        if timeSec < 30 { return "Goal: survive 0:30" }
+        if timeSec < bossTeaseSeconds { return "Goal: reach 1:00" }
+        if timeSec < Int(bossSpawnSeconds) { return "Goal: boss at 1:30" }
+        if kills < 25 { return "Goal: 25-kill streak" }
+        if kills < 50 { return "Goal: 50-kill streak" }
+        return "Goal: outlast the boss"
     }
 
     // MARK: - Combat pressure (mirrors GameScene contact + shooter cadence)

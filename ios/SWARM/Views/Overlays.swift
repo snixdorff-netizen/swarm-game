@@ -379,6 +379,23 @@ struct SettingsOverlay: View {
     }
 }
 
+struct PlayingHUDOverlay: View {
+    let hint: String
+    var body: some View {
+        VStack {
+            Spacer()
+            Text(hint)
+                .font(SwarmTheme.ui(12, .semibold))
+                .foregroundColor(SwarmTheme.foam.opacity(0.55))
+                .padding(.horizontal, 14)
+                .padding(.vertical, 6)
+                .background(Capsule().fill(Color.black.opacity(0.35)))
+                .padding(.bottom, 18)
+        }
+        .allowsHitTesting(false)
+    }
+}
+
 struct RunBannerOverlay: View {
     let text: String
     var body: some View {
