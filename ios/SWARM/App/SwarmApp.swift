@@ -28,6 +28,7 @@ final class GameHost: ObservableObject {
         model.onStart = { s.startRun() }
         model.onChoose = { id in s.applyUpgrade(id) }
         model.onRestart = { s.restartToMenu() }
+        model.onListenBurst = { s.triggerListenBurst() }
     }
 }
 
@@ -48,10 +49,9 @@ struct GameRootView: View {
             case .dead: GameOverOverlay(model: model)
             case .meta: MetaOverlay(model: model)
             case .settings: SettingsOverlay(model: model)
+            case .catalog: CatalogOverlay(model: model)
             case .playing:
-                if let hint = model.nextGoalHint {
-                    PlayingHUDOverlay(hint: hint)
-                }
+                PlayingFieldOverlay(model: model)
                 if let banner = model.runBanner {
                     RunBannerOverlay(text: banner)
                 }

@@ -14,7 +14,7 @@ struct UpgradeCard: Identifiable {
 }
 
 final class GameModel: ObservableObject {
-    enum Phase { case menu, playing, levelUp, dead, meta, settings }
+    enum Phase { case menu, playing, levelUp, dead, meta, settings, catalog }
 
     @Published var phase: Phase = .menu
     @Published var choices: [UpgradeCard] = []
@@ -35,24 +35,43 @@ final class GameModel: ObservableObject {
     @Published var deathHeadline: String = "SURVEY ENDED"
     @Published var deathSubline: String = ""
     @Published var runWasNewBest: Bool = false
+    @Published var deployMode: DeployMode = .sm5
+    @Published var spectrogram: SpectrogramSnapshot?
 
     let meta: MetaStore
+    let catalog: SpeciesCatalogStore
     private var cancellables = Set<AnyCancellable>()
 
     var bestTime: Int { meta.bestTime }
     var cores: Int { meta.cores }
 
-    init(meta: MetaStore = MetaStore()) {
+    private static let deployModeKey = "swarm_deploy_mode"
+
+    init(meta: MetaStore = MetaStore(), catalog: SpeciesCatalogStore = SpeciesCatalogStore()) {
         self.meta = meta
+        self.catalog = catalog
+        if let raw = UserDefaults.standard.string(forKey: Self.deployModeKey),
+           let mode = DeployMode(rawValue: raw) {
+            deployMode = mode
+        }
         meta.objectWillChange
             .sink { [weak self] _ in self?.objectWillChange.send() }
             .store(in: &cancellables)
+        catalog.objectWillChange
+            .sink { [weak self] _ in self?.objectWillChange.send() }
+            .store(in: &cancellables)
+    }
+
+    func setDeployMode(_ mode: DeployMode) {
+        deployMode = mode
+        UserDefaults.standard.set(mode.rawValue, forKey: Self.deployModeKey)
     }
 
     // Wired by the scene
     var onStart: () -> Void = {}
     var onChoose: (String) -> Void = { _ in }
     var onRestart: () -> Void = {}
+    var onListenBurst: () -> Void = {}
 
     func start() {
         runBanner = nil
@@ -60,8 +79,12 @@ final class GameModel: ObservableObject {
         deathHeadline = "SURVEY ENDED"
         deathSubline = ""
         runWasNewBest = false
+        spectrogram = nil
         onStart()
     }
+    func listenBurst() { onListenBurst() }
+    func openCatalog() { phase = .catalog }
+    func closeCatalog() { phase = .menu }
     func pick(_ id: String) { onChoose(id) }
     func restart() { onRestart() }
     func openMeta() { phase = .meta }

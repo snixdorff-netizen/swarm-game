@@ -113,6 +113,9 @@ final class GameScene: SKScene {
     private var hitMilestones: Set<Int> = []
     private var hitKillStreaks: Set<Int> = []
     private var speciesCallCooldown: CGFloat = 0
+    private var deployMode: DeployMode = .sm5
+    private var listenBurstTimer: CGFloat = 0
+    private var listenCooldown: CGFloat = 0
 
     // World
     private var enemies: [Enemy] = []
@@ -285,6 +288,10 @@ final class GameScene: SKScene {
         gems.forEach { $0.node.removeFromParent() }; gems.removeAll()
         orbitNodes.forEach { $0.removeFromParent() }; orbitNodes.removeAll()
         bossSpawned = false; bossWarnLabel.isHidden = true
+        deployMode = model?.deployMode ?? .sm5
+        listenBurstTimer = 0
+        listenCooldown = 0
+        model?.spectrogram = nil
         let meta = model?.meta
         dmgMult = meta?.damageMult ?? 1
         hp = 100 + (meta?.bonusHp ?? 0); maxHp = hp
@@ -355,6 +362,11 @@ final class GameScene: SKScene {
         guard model?.phase == .playing, dt > 0 else { return }
 
         runTime += dt
+        if listenBurstTimer > 0 {
+            listenBurstTimer -= dt
+            if listenBurstTimer <= 0 { model?.spectrogram = nil }
+        }
+        if listenCooldown > 0 { listenCooldown -= dt }
         if autopilotMovement {
             let casual = casualAutopilot && !playerInvulnerable
             let fleeR = casual ? BalanceEngine.casualAutopilotFleeRadius : 220
@@ -565,11 +577,17 @@ final class GameScene: SKScene {
 
     private func updateEnemies(_ dt: CGFloat) {
         let chaseMult = 1 + min(0.85, runTime * 0.01)
-        let detectR = BalanceEngine.detectionRadius(pickupRadius: pickupRadius, orbitLevel: orbitLevel, chainLevel: chainLevel)
+        let detectR = BalanceEngine.detectionRadius(
+            pickupRadius: pickupRadius, orbitLevel: orbitLevel, chainLevel: chainLevel,
+            deployMode: deployMode, listenBurstActive: listenBurstTimer > 0
+        )
         for e in enemies {
             let dx = pPos.x - e.node.position.x, dy = pPos.y - e.node.position.y
             let d = max(1, (dx*dx + dy*dy).squareRoot())
-            let visibility = min(1, max(0.1, 1.15 - d / detectR))
+            var visibility = min(1, max(0.1, 1.15 - d / detectR))
+            if e.kind == SurveySpecies.endangered.rawValue {
+                visibility = min(1, visibility * deployMode.ultrasonicVisibilityBoost)
+            }
             e.node.alpha = e.kind == EnemyKind.boss.rawValue ? max(0.35, visibility) : visibility
             if e.kind == 3 {
                 let keep = e.radius + 140
@@ -618,7 +636,11 @@ final class GameScene: SKScene {
     private func updateSpeciesCalls(_ dt: CGFloat) {
         guard model?.phase == .playing else { return }
         speciesCallCooldown = max(0, speciesCallCooldown - dt)
-        let detectR = BalanceEngine.detectionRadius(pickupRadius: pickupRadius, orbitLevel: orbitLevel, chainLevel: chainLevel)
+        let listenActive = listenBurstTimer > 0
+        let detectR = BalanceEngine.detectionRadius(
+            pickupRadius: pickupRadius, orbitLevel: orbitLevel, chainLevel: chainLevel,
+            deployMode: deployMode, listenBurstActive: listenActive
+        )
         let hearR = BalanceEngine.hearRadius(detectionRadius: detectR)
 
         for e in enemies {
@@ -836,6 +858,7 @@ final class GameScene: SKScene {
         checkKillStreak(kills)
         let leech = CGFloat(leechLevel) * 5 + leechPerKill * 1.25
         if leech > 0 { hp = min(maxHp, hp + leech) }
+        model?.catalog.record(species)
         SpeciesCallSynth.shared.playConfirm(species: species)
         SfxPlayer.shared.kill(); Haptics.shared.kill()
         burst(at: e.node.position, color: e.node.color)
@@ -933,6 +956,44 @@ final class GameScene: SKScene {
         }
         pool.shuffle()
         return Array(pool.prefix(3))
+    }
+
+    // MARK: - Listen burst (spectrogram + extended detection)
+
+    func triggerListenBurst() {
+        guard model?.phase == .playing, listenCooldown <= 0 else { return }
+        listenBurstTimer = 1.35
+        listenCooldown = 2.75
+        let detectR = BalanceEngine.detectionRadius(
+            pickupRadius: pickupRadius, orbitLevel: orbitLevel, chainLevel: chainLevel,
+            deployMode: deployMode, listenBurstActive: true
+        )
+        let hearR = BalanceEngine.hearRadius(detectionRadius: detectR)
+        var nearby: [SurveySpecies] = []
+        var nearest: Enemy?
+        var nearestD = CGFloat.greatestFiniteMagnitude
+        for e in enemies {
+            let dx = e.node.position.x - pPos.x, dy = e.node.position.y - pPos.y
+            let d = (dx * dx + dy * dy).squareRoot()
+            guard d <= hearR else { continue }
+            let species = SurveySpecies.from(enemyKind: e.kind)
+            nearby.append(species)
+            if d < nearestD {
+                nearestD = d
+                nearest = e
+            }
+        }
+        model?.spectrogram = SpectrogramBuilder.snapshot(nearby: nearby, deployMode: deployMode)
+        if let e = nearest {
+            let dx = e.node.position.x - pPos.x
+            let pan = Float(max(-1, min(1, dx / max(nearestD, 1))))
+            SpeciesCallSynth.shared.play(
+                species: SurveySpecies.from(enemyKind: e.kind),
+                pan: pan,
+                volume: 0.58
+            )
+        }
+        SfxPlayer.shared.nova()
     }
 
     // MARK: - HUD publish

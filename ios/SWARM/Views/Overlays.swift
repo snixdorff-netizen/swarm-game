@@ -80,7 +80,12 @@ struct MenuOverlay: View {
                     if !seenHint {
                         FirstRunHint { seenHint = true }
                     }
+                    DeployModePicker(selection: Binding(
+                        get: { model.deployMode },
+                        set: { model.setDeployMode($0) }
+                    ))
                     Button(AcousticFieldCopy.deployButton) { model.start() }.buttonStyle(NeonButton())
+                    Button("Species Catalog") { model.openCatalog() }.buttonStyle(NeonButton(tint: Color(white: 0.26)))
                     Button(AcousticFieldCopy.fieldLabButton) { model.openMeta() }.buttonStyle(NeonButton(tint: Color(white: 0.22)))
                     if seenHint {
                         Text("Drag to move · classifiers scan automatically · collect green recording clips")
@@ -381,20 +386,199 @@ struct SettingsOverlay: View {
     }
 }
 
-struct PlayingHUDOverlay: View {
-    let hint: String
+private struct DeployModePicker: View {
+    @Binding var selection: DeployMode
+
     var body: some View {
-        VStack {
-            Spacer()
-            Text(hint)
-                .font(SwarmTheme.ui(12, .semibold))
-                .foregroundColor(SwarmTheme.foam.opacity(0.55))
-                .padding(.horizontal, 14)
-                .padding(.vertical, 6)
-                .background(Capsule().fill(Color.black.opacity(0.35)))
-                .padding(.bottom, 18)
+        HStack(spacing: 10) {
+            ForEach(DeployMode.allCases, id: \.self) { mode in
+                Button {
+                    selection = mode
+                } label: {
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack(spacing: 6) {
+                            Image(systemName: mode.symbol)
+                                .font(.system(size: 14, weight: .bold))
+                            Text(mode.title)
+                                .font(SwarmTheme.ui(12, .bold))
+                        }
+                        Text(mode.subtitle)
+                            .font(SwarmTheme.ui(9))
+                            .foregroundColor(SwarmTheme.foam.opacity(0.55))
+                            .lineLimit(2)
+                            .multilineTextAlignment(.leading)
+                    }
+                    .foregroundColor(selection == mode ? .black : SwarmTheme.foam.opacity(0.85))
+                    .padding(10)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(selection == mode ? SwarmTheme.lime : Color(white: 0.12))
+                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(selection == mode ? SwarmTheme.lime : SwarmTheme.cyan.opacity(0.25), lineWidth: 1)
+                    )
+                }
+                .buttonStyle(.plain)
+            }
         }
-        .allowsHitTesting(false)
+    }
+}
+
+struct CatalogOverlay: View {
+    @ObservedObject var model: GameModel
+    @ObservedObject private var catalog: SpeciesCatalogStore
+
+    init(model: GameModel) {
+        self.model = model
+        _catalog = ObservedObject(wrappedValue: model.catalog)
+    }
+
+    var body: some View {
+        ZStack {
+            SwarmTheme.bg.opacity(0.94).ignoresSafeArea()
+            VStack(spacing: 12) {
+                HStack {
+                    Text("SPECIES CATALOG")
+                        .font(SwarmTheme.title(28))
+                        .foregroundColor(SwarmTheme.cyan)
+                    Spacer()
+                    Text("\(catalog.discoveredCount)/\(catalog.entries.count)")
+                        .font(SwarmTheme.ui(14, .bold))
+                        .foregroundColor(SwarmTheme.lime)
+                }
+                .padding(.horizontal, 22)
+                .padding(.top, 20)
+
+                Text("Presence/absence inventory · Kaleidoscope-style log")
+                    .font(SwarmTheme.ui(12))
+                    .foregroundColor(SwarmTheme.foam.opacity(0.5))
+
+                ScrollView {
+                    VStack(spacing: 8) {
+                        ForEach(catalog.entries) { entry in
+                            catalogRow(entry)
+                        }
+                    }
+                    .padding(.horizontal, 22)
+                }
+
+                Button("Back") { model.closeCatalog() }
+                    .buttonStyle(NeonButton(tint: Color(white: 0.28)))
+                    .padding(.horizontal, 36)
+                    .padding(.bottom, 36)
+            }
+        }
+    }
+
+    private func catalogRow(_ entry: CatalogEntry) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: entry.discovered ? "checkmark.circle.fill" : "circle.dashed")
+                .foregroundColor(entry.discovered ? SwarmTheme.lime : SwarmTheme.foam.opacity(0.35))
+            VStack(alignment: .leading, spacing: 2) {
+                Text(entry.species.displayName)
+                    .font(SwarmTheme.ui(15, .bold))
+                    .foregroundColor(entry.discovered ? SwarmTheme.foam : SwarmTheme.foam.opacity(0.45))
+                Text(entry.species.bandLabel)
+                    .font(SwarmTheme.ui(11))
+                    .foregroundColor(SwarmTheme.foam.opacity(0.5))
+            }
+            Spacer()
+            Text(entry.discovered ? "\(entry.count)×" : "—")
+                .font(SwarmTheme.ui(14, .bold))
+                .foregroundColor(entry.discovered ? SwarmTheme.cyan : SwarmTheme.foam.opacity(0.3))
+        }
+        .padding(12)
+        .background(RoundedRectangle(cornerRadius: 12).fill(Color(white: 0.1)))
+    }
+}
+
+struct PlayingFieldOverlay: View {
+    @ObservedObject var model: GameModel
+
+    var body: some View {
+        ZStack {
+            VStack {
+                HStack {
+                    Spacer()
+                    Button {
+                        model.listenBurst()
+                    } label: {
+                        Label("Listen", systemImage: "ear.fill")
+                            .font(SwarmTheme.ui(13, .bold))
+                            .foregroundColor(.black)
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 9)
+                            .background(SwarmTheme.cyan)
+                            .clipShape(Capsule())
+                            .shadow(color: SwarmTheme.cyan.opacity(0.5), radius: 8)
+                    }
+                    .padding(.trailing, 16)
+                    .padding(.top, 52)
+                }
+                if let spec = model.spectrogram {
+                    SpectrogramStripView(snapshot: spec)
+                        .padding(.horizontal, 16)
+                        .padding(.top, 8)
+                        .transition(.opacity.combined(with: .move(edge: .top)))
+                }
+                Spacer()
+                if let hint = model.nextGoalHint {
+                    Text(hint)
+                        .font(SwarmTheme.ui(12, .semibold))
+                        .foregroundColor(SwarmTheme.foam.opacity(0.55))
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 6)
+                        .background(Capsule().fill(Color.black.opacity(0.35)))
+                        .padding(.bottom, 18)
+                        .allowsHitTesting(false)
+                }
+            }
+        }
+        .animation(.easeOut(duration: 0.2), value: model.spectrogram)
+    }
+}
+
+struct SpectrogramStripView: View {
+    let snapshot: SpectrogramSnapshot
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text("LISTEN BURST")
+                    .font(SwarmTheme.ui(10, .bold))
+                    .foregroundColor(SwarmTheme.lime)
+                Spacer()
+                Text(snapshot.deployMode == .sm5bat ? "SM5BAT" : "SM5")
+                    .font(SwarmTheme.ui(10, .bold))
+                    .foregroundColor(SwarmTheme.cyan.opacity(0.8))
+            }
+            HStack(alignment: .bottom, spacing: 8) {
+                ForEach(snapshot.bands) { band in
+                    VStack(spacing: 4) {
+                        RoundedRectangle(cornerRadius: 3)
+                            .fill(SwarmTheme.cyan.opacity(0.25 + Double(band.level) * 0.65))
+                            .frame(width: 28, height: max(8, 56 * band.level))
+                        Text(band.label)
+                            .font(.system(size: 7, weight: .semibold, design: .monospaced))
+                            .foregroundColor(SwarmTheme.foam.opacity(0.55))
+                            .multilineTextAlignment(.center)
+                            .frame(width: 72)
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity)
+            if let dominant = snapshot.dominantLabel {
+                Text(dominant)
+                    .font(SwarmTheme.ui(10, .semibold))
+                    .foregroundColor(SwarmTheme.foam.opacity(0.65))
+            }
+            Text("† ultrasonic band down-converted for playback")
+                .font(.system(size: 8))
+                .foregroundColor(SwarmTheme.foam.opacity(0.35))
+        }
+        .padding(12)
+        .background(RoundedRectangle(cornerRadius: 14).fill(Color.black.opacity(0.62)))
+        .overlay(RoundedRectangle(cornerRadius: 14).stroke(SwarmTheme.cyan.opacity(0.35), lineWidth: 1))
     }
 }
 

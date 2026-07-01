@@ -85,8 +85,17 @@ enum BalanceEngine {
     }
 
     /// Song Meter + classifier modules extend acoustic detection range (fauna visibility).
-    static func detectionRadius(pickupRadius: CGFloat, orbitLevel: Int, chainLevel: Int) -> CGFloat {
-        110 + pickupRadius * 0.55 + CGFloat(orbitLevel) * 28 + CGFloat(chainLevel) * 16
+    static func detectionRadius(
+        pickupRadius: CGFloat,
+        orbitLevel: Int,
+        chainLevel: Int,
+        deployMode: DeployMode = .sm5,
+        listenBurstActive: Bool = false
+    ) -> CGFloat {
+        var r = 110 + pickupRadius * 0.55 + CGFloat(orbitLevel) * 28 + CGFloat(chainLevel) * 16
+        r *= deployMode.acousticDetectMult
+        if listenBurstActive { r *= deployMode.listenBurstMult }
+        return r
     }
 
     /// Fauna vocalizations audible beyond visual detection (bioacoustic hear radius).
