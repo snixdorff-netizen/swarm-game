@@ -89,6 +89,11 @@ enum BalanceEngine {
         110 + pickupRadius * 0.55 + CGFloat(orbitLevel) * 28 + CGFloat(chainLevel) * 16
     }
 
+    /// Fauna vocalizations audible beyond visual detection (bioacoustic hear radius).
+    static func hearRadius(detectionRadius: CGFloat) -> CGFloat {
+        detectionRadius * 1.42
+    }
+
     /// Casual-friendly hint for the in-run HUD (what to chase next).
     static func nextGoalHint(timeSec: Int, kills: Int) -> String {
         if timeSec < 30 { return "Goal: establish 0:30 baseline" }

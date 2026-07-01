@@ -19,9 +19,12 @@ private final class Enemy {
     var kind: Int          // 0 basic, 1 fast, 2 tank, 3 shooter, 9 boss
     var flash: CGFloat = 0
     var shootTimer: CGFloat = 0
+    var callTimer: CGFloat = 0
     init(node: SKSpriteNode, hp: CGFloat, speed: CGFloat, radius: CGFloat, dmg: CGFloat, xp: CGFloat, kind: Int = 0) {
         self.node = node; self.hp = hp; self.maxHp = hp; self.speed = speed
         self.radius = radius; self.dmg = dmg; self.xp = xp; self.kind = kind
+        let profile = SpeciesCallProfiles.profile(for: SurveySpecies.from(enemyKind: kind))
+        callTimer = CGFloat.random(in: 0.2...(profile.callInterval * 0.85))
     }
 }
 private final class EnemyShot {
@@ -109,6 +112,7 @@ final class GameScene: SKScene {
     private var leechPerKill: CGFloat = 0
     private var hitMilestones: Set<Int> = []
     private var hitKillStreaks: Set<Int> = []
+    private var speciesCallCooldown: CGFloat = 0
 
     // World
     private var enemies: [Enemy] = []
@@ -397,6 +401,7 @@ final class GameScene: SKScene {
         spawn(dt)
         maybeBoss()
         updateEnemies(dt)
+        updateSpeciesCalls(dt)
         fireWeapons(dt)
         updateProjectiles(dt)
         updateEnemyShots(dt)
@@ -538,6 +543,7 @@ final class GameScene: SKScene {
     }
 
     private func spawnBoss() {
+        SpeciesCallSynth.shared.play(species: .endangered, pan: 0, volume: 0.55)
         SfxPlayer.shared.boss(); Haptics.shared.boss()
         let rareBanner = "⚠ ENDANGERED ULTRASONIC"
         model?.runBanner = rareBanner
@@ -606,6 +612,38 @@ final class GameScene: SKScene {
                 }
                 hurtCooldown = BalanceEngine.contactHurtCooldown
             }
+        }
+    }
+
+    private func updateSpeciesCalls(_ dt: CGFloat) {
+        guard model?.phase == .playing else { return }
+        speciesCallCooldown = max(0, speciesCallCooldown - dt)
+        let detectR = BalanceEngine.detectionRadius(pickupRadius: pickupRadius, orbitLevel: orbitLevel, chainLevel: chainLevel)
+        let hearR = BalanceEngine.hearRadius(detectionRadius: detectR)
+
+        for e in enemies {
+            e.callTimer -= dt
+            guard e.callTimer <= 0 else { continue }
+
+            let dx = e.node.position.x - pPos.x
+            let dy = e.node.position.y - pPos.y
+            let d = (dx * dx + dy * dy).squareRoot()
+            guard d <= hearR else {
+                e.callTimer = 0.35
+                continue
+            }
+            guard speciesCallCooldown <= 0 else { continue }
+
+            let species = SurveySpecies.from(enemyKind: e.kind)
+            let profile = SpeciesCallProfiles.profile(for: species)
+            let pan = Float(max(-1, min(1, dx / max(d, 1))))
+            let proximity = max(0.15, 1 - d / hearR)
+            let vol = Float(proximity) * (species == .endangered ? 0.62 : 0.48)
+            SpeciesCallSynth.shared.play(species: species, pan: pan, volume: vol)
+
+            let jitter = CGFloat.random(in: 0.75...1.25)
+            e.callTimer = profile.callInterval * jitter
+            speciesCallCooldown = species == .endangered ? 0.08 : 0.14
         }
     }
 
@@ -798,6 +836,7 @@ final class GameScene: SKScene {
         checkKillStreak(kills)
         let leech = CGFloat(leechLevel) * 5 + leechPerKill * 1.25
         if leech > 0 { hp = min(maxHp, hp + leech) }
+        SpeciesCallSynth.shared.playConfirm(species: species)
         SfxPlayer.shared.kill(); Haptics.shared.kill()
         burst(at: e.node.position, color: e.node.color)
         dropGem(at: e.node.position, value: e.xp)
