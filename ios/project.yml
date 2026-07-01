@@ -24,6 +24,8 @@ targets:
       - path: SWARM
     entitlements:
       path: SWARM/SWARM.entitlements
+      properties:
+        com.apple.developer.game-center: true
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: ai.swarm.game

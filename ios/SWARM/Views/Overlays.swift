@@ -68,6 +68,11 @@ struct MenuOverlay: View {
                 Text(gameCenter.statusLine)
                     .font(SwarmTheme.ui(11))
                     .foregroundColor(SwarmTheme.foam.opacity(gameCenter.isAvailable ? 0.45 : 0.3))
+                if !gameCenter.syncStatusLine.isEmpty {
+                    Text(gameCenter.syncStatusLine)
+                        .font(SwarmTheme.ui(10))
+                        .foregroundColor(SwarmTheme.lime.opacity(0.55))
+                }
                 Spacer()
                 VStack(spacing: 14) {
                     if !seenHint {
@@ -344,8 +349,8 @@ struct SettingsOverlay: View {
                     .padding(.bottom, 48)
             }
         }
-        .onChange(of: soundOn) { GameSettings.soundEnabled = $0 }
-        .onChange(of: hapticsOn) { GameSettings.hapticsEnabled = $0 }
+        .onBooleanChange(soundOn) { GameSettings.soundEnabled = $0 }
+        .onBooleanChange(hapticsOn) { GameSettings.hapticsEnabled = $0 }
     }
 
     private func settingsToggle(_ title: String, isOn: Binding<Bool>) -> some View {
@@ -362,3 +367,14 @@ struct SettingsOverlay: View {
 }
 
 func timeStr(_ s: Int) -> String { String(format: "%d:%02d", s / 60, s % 60) }
+
+private extension View {
+    @ViewBuilder
+    func onBooleanChange(_ value: Bool, perform: @escaping (Bool) -> Void) -> some View {
+        if #available(iOS 17.0, *) {
+            onChange(of: value) { _, newValue in perform(newValue) }
+        } else {
+            onChange(of: value, perform: perform)
+        }
+    }
+}

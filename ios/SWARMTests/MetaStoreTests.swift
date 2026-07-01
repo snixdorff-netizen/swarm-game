@@ -165,4 +165,16 @@ final class MetaStoreTests: XCTestCase {
         let reloaded = MetaStore(defaults: defaults)
         XCTAssertEqual(reloaded.level(for: "meta_dmg"), 0)
     }
+
+    func testCanBuyEachCatalogEntry() {
+        store.awardRun(kills: 500, timeSec: 600)
+        for up in MetaCatalog.all {
+            let coresBefore = store.cores
+            let cost = up.cost(0)
+            XCTAssertTrue(store.canBuy(up), "expected canBuy for \(up.id)")
+            XCTAssertTrue(store.buy(up), "expected buy for \(up.id)")
+            XCTAssertEqual(store.level(for: up.id), 1)
+            XCTAssertEqual(store.cores, coresBefore - cost)
+        }
+    }
 }

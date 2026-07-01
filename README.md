@@ -69,7 +69,7 @@ Build an App Store IPA for upload:
 chmod +x scripts/build-testflight.sh   # one-time
 DEVELOPMENT_TEAM=YOUR_TEAM_ID ./scripts/build-testflight.sh
 ```
-Requires Xcode with your Apple ID signed in (Settings → Accounts) and automatic signing. Upload the IPA with **Transporter** (recommended) or `xcrun iTMSTransporter`.
+The script writes `build/export/ExportOptions.plist` with your team ID — there is no separate checked-in export plist. Requires Xcode with your Apple ID signed in (Settings → Accounts) and automatic signing. Upload the IPA with **Transporter** (recommended) or `xcrun iTMSTransporter`.
 
 ## Layout
 ```

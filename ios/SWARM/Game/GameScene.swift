@@ -704,8 +704,11 @@ final class GameScene: SKScene {
         model?.kills = kills
         model?.level = level
         model?.coresEarned = MetaStore.coresForRun(kills: kills, timeSec: t)
-        if model?.meta.awardRun(kills: kills, timeSec: t) == true {
-            GameCenterManager.shared.submitBestTime(t)
+        let newBest = model?.meta.awardRun(kills: kills, timeSec: t) == true
+        if GameCenterLogic.shouldSubmitLeaderboard(newBest: newBest, seconds: t) {
+            Task { @MainActor in
+                GameCenterManager.shared.submitBestTime(t)
+            }
         }
         SfxPlayer.shared.death(); Haptics.shared.death()
         model?.phase = .dead

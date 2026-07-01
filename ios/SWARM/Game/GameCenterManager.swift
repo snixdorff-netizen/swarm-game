@@ -10,11 +10,13 @@ final class GameCenterManager: NSObject, ObservableObject {
     static let leaderboardID = "ai.swarm.game.besttime"
 
     @Published private(set) var statusLine: String = ""
+    @Published private(set) var syncStatusLine: String = ""
     @Published private(set) var isAvailable: Bool = false
 
     private var pendingBestTime: Int?
     private var authHandlerInstalled = false
     private weak var pendingAuthVC: UIViewController?
+    private var authRetryTask: Task<Void, Never>?
 
     private override init() {
         super.init()
@@ -30,7 +32,7 @@ final class GameCenterManager: NSObject, ObservableObject {
         #if targetEnvironment(simulator)
         return
         #else
-        guard !authHandlerInstalled else {
+        if authHandlerInstalled {
             retryPresentAuthIfNeeded()
             return
         }
@@ -46,10 +48,11 @@ final class GameCenterManager: NSObject, ObservableObject {
                     return
                 }
                 self.pendingAuthVC = nil
+                self.authRetryTask?.cancel()
                 if player.isAuthenticated {
                     self.isAvailable = true
                     self.statusLine = "Signed in to Game Center"
-                    self.flushPendingSubmit()
+                    self.trySubmitPending()
                 } else {
                     self.isAvailable = false
                     if let error {
@@ -69,11 +72,11 @@ final class GameCenterManager: NSObject, ObservableObject {
         #if targetEnvironment(simulator)
         return
         #else
-        if isAvailable, GKLocalPlayer.local.isAuthenticated {
-            submitNow(seconds)
-        } else {
-            pendingBestTime = max(pendingBestTime ?? 0, seconds)
+        pendingBestTime = GameCenterLogic.mergedPending(existing: pendingBestTime, new: seconds)
+        if GameCenterLogic.shouldQueueSubmit(isAvailable: isAvailable, isAuthenticated: GKLocalPlayer.local.isAuthenticated) {
+            return
         }
+        trySubmitPending()
         #endif
     }
 
@@ -82,9 +85,16 @@ final class GameCenterManager: NSObject, ObservableObject {
         presentAuth(vc)
     }
 
-    private func flushPendingSubmit() {
-        guard let pending = pendingBestTime else { return }
-        pendingBestTime = nil
+    func retryPendingSubmit() {
+        #if !targetEnvironment(simulator)
+        trySubmitPending()
+        #endif
+    }
+
+    private func trySubmitPending() {
+        guard let pending = pendingBestTime,
+              isAvailable,
+              GKLocalPlayer.local.isAuthenticated else { return }
         submitNow(pending)
     }
 
@@ -99,7 +109,18 @@ final class GameCenterManager: NSObject, ObservableObject {
                 guard let self else { return }
                 if let error {
                     NSLog("Leaderboard submit failed: %@", error.localizedDescription)
-                    self.statusLine = "Leaderboard sync failed"
+                    self.pendingBestTime = GameCenterLogic.mergedPending(existing: self.pendingBestTime, new: seconds)
+                    self.syncStatusLine = "Leaderboard sync pending"
+                } else {
+                    self.pendingBestTime = GameCenterLogic.pendingAfterSuccessfulSubmit(
+                        submitted: seconds,
+                        pending: self.pendingBestTime
+                    )
+                    if self.pendingBestTime == nil {
+                        self.syncStatusLine = ""
+                    } else {
+                        self.trySubmitPending()
+                    }
                 }
             }
         }
@@ -112,11 +133,23 @@ final class GameCenterManager: NSObject, ObservableObject {
             .first(where: { $0.isKeyWindow })?
             .rootViewController else {
             statusLine = "Sign in to Game Center"
+            scheduleAuthRetry()
             return
         }
         var top = root
         while let presented = top.presentedViewController { top = presented }
         guard top.presentedViewController !== vc else { return }
         top.present(vc, animated: true)
+    }
+
+    private func scheduleAuthRetry() {
+        authRetryTask?.cancel()
+        authRetryTask = Task { @MainActor in
+            for delay in [0.4, 1.0, 2.0] {
+                try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+                guard !Task.isCancelled, self.pendingAuthVC != nil else { return }
+                self.retryPresentAuthIfNeeded()
+            }
+        }
     }
 }

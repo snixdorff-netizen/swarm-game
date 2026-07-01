@@ -62,27 +62,37 @@ enum ShareCardRenderer {
 struct ActivityShareSheet: UIViewControllerRepresentable {
     let items: [Any]
 
-    func makeCoordinator() -> Coordinator { Coordinator() }
+    func makeCoordinator() -> Coordinator { Coordinator(items: items) }
 
-    func makeUIViewController(context: Context) -> UIViewController {
-        let host = UIViewController()
-        host.view.backgroundColor = .clear
-        context.coordinator.host = host
-        DispatchQueue.main.async {
-            let activity = UIActivityViewController(activityItems: items, applicationActivities: nil)
-            if let popover = activity.popoverPresentationController {
-                popover.sourceView = host.view
-                popover.sourceRect = CGRect(x: host.view.bounds.midX, y: host.view.bounds.midY, width: 1, height: 1)
-                popover.permittedArrowDirections = .any
-            }
-            host.present(activity, animated: true)
-        }
+    func makeUIViewController(context: Context) -> ShareHostViewController {
+        let host = ShareHostViewController()
+        host.coordinator = context.coordinator
         return host
     }
 
-    func updateUIViewController(_ uiViewController: UIViewController, context: Context) {}
+    func updateUIViewController(_ uiViewController: ShareHostViewController, context: Context) {}
 
     final class Coordinator {
-        weak var host: UIViewController?
+        let items: [Any]
+        var presented = false
+        init(items: [Any]) { self.items = items }
+    }
+}
+
+final class ShareHostViewController: UIViewController {
+    weak var coordinator: ActivityShareSheet.Coordinator?
+
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        guard let coordinator, !coordinator.presented else { return }
+        coordinator.presented = true
+        view.layoutIfNeeded()
+        let activity = UIActivityViewController(activityItems: coordinator.items, applicationActivities: nil)
+        if let popover = activity.popoverPresentationController {
+            popover.sourceView = view
+            popover.sourceRect = CGRect(x: view.bounds.midX, y: view.bounds.midY, width: 1, height: 1)
+            popover.permittedArrowDirections = .any
+        }
+        present(activity, animated: true)
     }
 }

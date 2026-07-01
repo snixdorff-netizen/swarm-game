@@ -32,6 +32,7 @@ final class GameHost: ObservableObject {
 }
 
 struct GameRootView: View {
+    @Environment(\.scenePhase) private var scenePhase
     @ObservedObject var host: GameHost
     @ObservedObject private var model: GameModel
     init(host: GameHost) { self.host = host; _model = ObservedObject(wrappedValue: host.model) }
@@ -54,6 +55,12 @@ struct GameRootView: View {
         .preferredColorScheme(.dark)
         .onAppear {
             GameCenterManager.shared.authenticate()
+            GameCenterManager.shared.retryPresentAuthIfNeeded()
+        }
+        .onChange(of: scenePhase) { phase in
+            guard phase == .active else { return }
+            GameCenterManager.shared.retryPresentAuthIfNeeded()
+            GameCenterManager.shared.retryPendingSubmit()
         }
     }
 }
