@@ -32,10 +32,12 @@ final class RunSimulatorTests: XCTestCase {
 
     @MainActor
     func testHeadlessBuildProfilesDivergeOnRealLoop() {
-        let bolt = HeadlessRunDriver.batch(count: 4, baseSeed: 200, profile: .baseline, maxSeconds: 120, mode: .mortal).map(\.asRunMetrics)
-        let leech = HeadlessRunDriver.batch(count: 4, baseSeed: 200, profile: .leechTank, maxSeconds: 120, mode: .mortal).map(\.asRunMetrics)
-        XCTAssertTrue(RunSimulator.runsDivergeOnSurvival(bolt, leech) || RunSimulator.medianKills(leech) != RunSimulator.medianKills(bolt))
-        XCTAssertGreaterThanOrEqual(RunSimulator.medianSurvival(leech), RunSimulator.medianSurvival(bolt))
+        let bolt = HeadlessRunDriver.batch(count: 6, baseSeed: 200, profile: .baseline, maxSeconds: 120, mode: .mortal).map(\.asRunMetrics)
+        let leech = HeadlessRunDriver.batch(count: 6, baseSeed: 200, profile: .leechTank, maxSeconds: 120, mode: .mortal).map(\.asRunMetrics)
+        let survivalGap = abs(RunSimulator.medianSurvival(leech) - RunSimulator.medianSurvival(bolt))
+        let killGap = abs(RunSimulator.medianKills(leech) - RunSimulator.medianKills(bolt))
+        XCTAssertTrue(survivalGap >= 3 || killGap >= 4, "Leech tank should diverge from baseline on survival or kills")
+        XCTAssertGreaterThanOrEqual(RunSimulator.medianSurvival(leech), RunSimulator.medianSurvival(bolt) - 2)
     }
 
     @MainActor

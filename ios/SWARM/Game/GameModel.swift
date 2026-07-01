@@ -42,6 +42,7 @@ final class GameModel: ObservableObject {
     @Published var noiseBudgetPct: Int = 100
     @Published var speciesRichness: Int = 0
     @Published var surveyScoreBest: Bool = false
+    @Published var recentVouchers: [DetectionVoucher] = []
 
     let meta: MetaStore
     let catalog: SpeciesCatalogStore
@@ -90,6 +91,7 @@ final class GameModel: ObservableObject {
         spectrogram = nil
         speciesRichness = 0
         noiseBudgetPct = 100
+        recentVouchers = []
         onStart()
     }
     func listenBurst() { onListenBurst() }

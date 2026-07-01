@@ -210,9 +210,20 @@ final class GameScene: SKScene {
         var y = -span
         while y <= span { path.move(to: CGPoint(x: -span, y: y)); path.addLine(to: CGPoint(x: span, y: y)); y += step }
         let g = SKShapeNode(path: path)
-        g.strokeColor = C.grid; g.lineWidth = 1; g.zPosition = -10
+        g.strokeColor = gridStrokeColor(); g.lineWidth = 1; g.zPosition = -10
         gridNode.addChild(g)
         addChild(gridNode)
+    }
+
+    private func gridStrokeColor() -> SKColor {
+        let g = deployMode.sceneGrid
+        return SKColor(red: g.r, green: g.g, blue: g.b, alpha: 1)
+    }
+
+    private func applyDeployPalette() {
+        let bg = deployMode.sceneBackground
+        backgroundColor = SKColor(red: bg.r, green: bg.g, blue: bg.b, alpha: 1)
+        buildGrid()
     }
 
     private func buildPlayer() {
@@ -310,6 +321,7 @@ final class GameScene: SKScene {
         model?.activeMission = runMission
         model?.spectrogram = nil
         model?.surveyReport = nil
+        applyDeployPalette()
         let meta = model?.meta
         dmgMult = meta?.damageMult ?? 1
         hp = 100 + (meta?.bonusHp ?? 0); maxHp = hp
@@ -488,6 +500,16 @@ final class GameScene: SKScene {
         }
     }
 
+    private func showDetectionBanner(_ banner: String, pulse: Bool = false, duration: TimeInterval = 1.2) {
+        if let current = model?.runBanner, isPriorityRunBanner(current) { return }
+        showRunBanner(banner, pulse: pulse, duration: duration)
+    }
+
+    private func isPriorityRunBanner(_ banner: String) -> Bool {
+        if banner == BalanceEngine.bossTeaseBanner() { return true }
+        return BalanceEngine.milestoneSeconds.contains { BalanceEngine.milestoneBanner(for: $0) == banner }
+    }
+
     private func pulseMilestone(_ text: String) {
         let n = label(22, weight: .heavy)
         n.text = text
@@ -544,7 +566,7 @@ final class GameScene: SKScene {
         let dist = max(size.width, size.height) * 0.56
         let pos = CGPoint(x: pPos.x + cos(ang) * dist, y: pPos.y + sin(ang) * dist)
         let roll = spawnUnit()
-        let kind = BalanceEngine.enemyKind(runTime: runTime, roll: roll)
+        let kind = BalanceEngine.enemyKind(runTime: runTime, roll: roll, deployMode: deployMode)
         let stats = BalanceEngine.enemyStats(kind: kind, runTime: runTime)
         var color = C.basic, sz: CGFloat = 22
         switch kind {
@@ -569,7 +591,8 @@ final class GameScene: SKScene {
             .group([.scale(to: 1.0, duration: 0.9), .fadeAlpha(to: 0.55, duration: 0.9)])
         ])))
         let speciesRoll = spawnUnit()
-        let species = ProjectSpeciesCatalog.pick(archetype: kind.rawValue, roll: speciesRoll)
+        let archetype = BalanceEngine.speciesArchetype(for: kind, roll: speciesRoll, deployMode: deployMode)
+        let species = ProjectSpeciesCatalog.pick(archetype: archetype, roll: speciesRoll)
         enemies.append(Enemy(node: node, hp: stats.hp, speed: stats.speed, radius: stats.radius,
                              dmg: stats.damage, xp: stats.xp, kind: kind.rawValue, speciesId: species.id))
     }
@@ -698,8 +721,8 @@ final class GameScene: SKScene {
             SpeciesCallSynth.shared.play(species: legacy, pan: pan, volume: vol)
 
             let jitter = CGFloat.random(in: 0.75...1.25)
-            e.callTimer = profile.callInterval * jitter
-            speciesCallCooldown = project.callBand == .ultrasonic ? 0.08 : 0.14
+            e.callTimer = profile.callInterval * jitter * deployMode.callIntervalScale
+            speciesCallCooldown = (project.callBand == .ultrasonic ? 0.08 : 0.14) * deployMode.callIntervalScale
         }
     }
 
@@ -889,6 +912,11 @@ final class GameScene: SKScene {
         e.node.removeFromParent()
         if let idx = enemies.firstIndex(where: { $0 === e }) { enemies.remove(at: idx) }
         kills += 1; model?.kills = kills
+        if e.kind == 3 && !validated {
+            hp = max(0, hp - BalanceEngine.falsePositiveNoisePenalty)
+            flashHurt()
+            showDetectionBanner("False positive — noise budget −\(Int(BalanceEngine.falsePositiveNoisePenalty))", pulse: true, duration: 1.4)
+        }
         let voucher = DetectionVoucher(
             id: "v-\(kills)-\(Int(runTime))",
             speciesId: project.id,
@@ -900,14 +928,17 @@ final class GameScene: SKScene {
         )
         detectionVouchers.append(voucher)
         model?.speciesRichness = Set(detectionVouchers.map(\.speciesId)).count
-        showRunBanner(
-            validated ? "Detection: \(project.commonName)" : "Tentative: \(project.commonName)",
-            pulse: false, duration: 1.2
-        )
+        model?.recentVouchers = Array(detectionVouchers.suffix(3))
+        if !(e.kind == 3 && !validated) {
+            showDetectionBanner(
+                validated ? "Detection: \(project.commonName)" : "Tentative: \(project.commonName)",
+                pulse: false, duration: 1.2
+            )
+        }
         checkKillStreak(kills)
         let leech = CGFloat(leechLevel) * 5 + leechPerKill * 1.25
         if leech > 0 { hp = min(maxHp, hp + leech) }
-        model?.catalog.record(project)
+        model?.catalog.record(project, deployMode: deployMode)
         SpeciesCallSynth.shared.playConfirm(species: legacy)
         SfxPlayer.shared.kill(); Haptics.shared.kill()
         burst(at: e.node.position, color: e.node.color)
@@ -978,9 +1009,11 @@ final class GameScene: SKScene {
         let lines = EngagementCopy.deathLines(report: report, isNewBestScore: newScore)
         model?.deathHeadline = lines.headline
         model?.deathSubline = lines.subline
-        if GameCenterLogic.shouldSubmitLeaderboard(newBest: t > (model?.bestTime ?? 0), seconds: t) {
-            Task { @MainActor in GameCenterManager.shared.submitBestTime(t) }
+        if GameCenterLogic.shouldSubmitScoreLeaderboard(newBest: newScore, score: report.surveyScore) {
+            Task { @MainActor in GameCenterManager.shared.submitBestSurveyScore(report.surveyScore) }
         }
+        let speciesSeen = Set(detectionVouchers.map(\.speciesId))
+        model?.catalog.markDeploymentRecorded(speciesIds: speciesSeen, deployMode: deployMode)
         if aborted {
             SfxPlayer.shared.death(); Haptics.shared.death()
         } else {

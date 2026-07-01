@@ -29,10 +29,12 @@ final class SpectrogramCatalogTests: XCTestCase {
         ud.removePersistentDomain(forName: suite)
         let store = SpeciesCatalogStore(defaults: ud)
         XCTAssertEqual(store.discoveredCount, 0)
-        store.record(woodThrush)
-        store.record(woodThrush)
-        store.record(littleBrownBat)
+        store.record(woodThrush, deployMode: .sm5)
+        store.record(woodThrush, deployMode: .sm5)
+        store.record(littleBrownBat, deployMode: .sm5bat)
         XCTAssertEqual(store.count(for: woodThrush), 2)
+        XCTAssertEqual(store.record(for: woodThrush).sm5Count, 2)
+        XCTAssertEqual(store.record(for: littleBrownBat).sm5batCount, 1)
         XCTAssertEqual(store.discoveredCount, 2)
         let reloaded = SpeciesCatalogStore(defaults: ud)
         XCTAssertEqual(reloaded.count(for: woodThrush), 2)
@@ -61,9 +63,11 @@ final class SpectrogramCatalogTests: XCTestCase {
         let ud = UserDefaults(suiteName: suite)!
         ud.removePersistentDomain(forName: suite)
         UserDefaults.standard.removeObject(forKey: "swarm_deploy_mode")
+        defer { UserDefaults.standard.removeObject(forKey: "swarm_deploy_mode") }
         let model = GameModel(meta: MetaStore(defaults: ud), catalog: SpeciesCatalogStore(defaults: ud))
         model.setDeployMode(.sm5bat)
         XCTAssertEqual(model.deployMode, .sm5bat)
         XCTAssertEqual(UserDefaults.standard.string(forKey: "swarm_deploy_mode"), "sm5bat")
+        model.setDeployMode(.sm5)
     }
 }

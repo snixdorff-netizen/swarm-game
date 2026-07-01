@@ -15,6 +15,10 @@ enum GameCenterLogic {
         newBest && seconds > 0
     }
 
+    static func shouldSubmitScoreLeaderboard(newBest: Bool, score: Int) -> Bool {
+        newBest && score > 0
+    }
+
     /// Returns nil when the in-flight score matches pending (submit succeeded).
     static func pendingAfterSuccessfulSubmit(submitted: Int, pending: Int?) -> Int? {
         guard pending == submitted else { return pending }

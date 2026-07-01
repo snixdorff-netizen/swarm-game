@@ -31,12 +31,38 @@ enum BalanceEngine {
     }
 
     /// Deterministic enemy kind from run time and roll in 0...1.
-    static func enemyKind(runTime: CGFloat, roll: CGFloat) -> EnemyKind {
-        if runTime > 60 && roll < 0.16 { return .tank }
-        if runTime > 45 && roll < 0.28 { return .shooter }
-        if runTime > 28 && roll < 0.42 { return .fast }
-        return .basic
+    static func enemyKind(runTime: CGFloat, roll: CGFloat, deployMode: DeployMode = .sm5) -> EnemyKind {
+        switch deployMode {
+        case .sm5bat:
+            if runTime > 55 && roll < 0.10 { return .tank }
+            if runTime > 38 && roll < 0.18 { return .shooter }
+            if runTime > 10 && roll < 0.52 { return .fast }
+            return .basic
+        case .sm5:
+            if runTime > 60 && roll < 0.16 { return .tank }
+            if runTime > 45 && roll < 0.28 { return .shooter }
+            if runTime > 28 && roll < 0.42 { return .fast }
+            return .basic
+        }
     }
+
+    /// SM5BAT biases spawns toward ultrasonic archetypes (bat passes).
+    static func speciesArchetype(for kind: EnemyKind, roll: CGFloat, deployMode: DeployMode) -> Int {
+        if deployMode == .sm5bat {
+            switch kind {
+            case .fast, .basic:
+                if roll < 0.42 { return EnemyKind.boss.rawValue }
+            case .shooter:
+                if roll < 0.28 { return EnemyKind.boss.rawValue }
+            default:
+                break
+            }
+        }
+        return kind.rawValue
+    }
+
+    /// Noise budget penalty when a mimic is logged without Listen validation (P1#9).
+    static let falsePositiveNoisePenalty: CGFloat = 18
 
     static func difficultyScale(runTime: CGFloat) -> CGFloat {
         1 + runTime * 0.012

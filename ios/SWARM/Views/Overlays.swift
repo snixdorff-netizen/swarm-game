@@ -182,6 +182,7 @@ struct GameOverOverlay: View {
     @ObservedObject var model: GameModel
     @State private var shareImage: UIImage?
     @State private var showShare = false
+    @State private var showReportExport = false
     @State private var shareFailed = false
 
     private var report: SurveyRunReport? { model.surveyReport }
@@ -250,6 +251,10 @@ struct GameOverOverlay: View {
 
                     VStack(spacing: 12) {
                         Button("Deploy again") { model.start() }.buttonStyle(NeonButton(tint: SwarmTheme.cyan))
+                        if report != nil {
+                            Button("Export survey report") { showReportExport = true }
+                                .buttonStyle(NeonButton(tint: Color(white: 0.22)))
+                        }
                         Button("Share") { presentShare() }.buttonStyle(NeonButton(tint: SwarmTheme.lime))
                         Button("Menu") { model.restart() }.buttonStyle(NeonButton(tint: Color(white: 0.3)))
                     }
@@ -263,6 +268,14 @@ struct GameOverOverlay: View {
         .sheet(isPresented: $showShare, onDismiss: { shareImage = nil }) {
             if let shareImage {
                 ActivityShareSheet(items: [shareImage, AcousticFieldCopy.shareTagline])
+            }
+        }
+        .sheet(isPresented: $showReportExport) {
+            if let report {
+                ActivityShareSheet(items: [
+                    SurveyReportExporter.textReport(report, deployMode: model.deployMode),
+                    SurveyReportExporter.csvRows(report, deployMode: model.deployMode),
+                ])
             }
         }
         .alert("Couldn't create share image", isPresented: $shareFailed) {
@@ -524,7 +537,7 @@ struct CatalogOverlay: View {
                 .padding(.horizontal, 22)
                 .padding(.top, 20)
 
-                Text("Presence/absence inventory · Kaleidoscope-style log")
+                Text("Study notebook · presence/absence across deployments")
                     .font(SwarmTheme.ui(12))
                     .foregroundColor(SwarmTheme.foam.opacity(0.5))
 
@@ -560,14 +573,40 @@ struct CatalogOverlay: View {
                 Text(entry.species.bandLabel)
                     .font(SwarmTheme.ui(10))
                     .foregroundColor(SwarmTheme.foam.opacity(0.45))
+                if entry.discovered {
+                    notebookMeta(entry.record)
+                }
             }
             Spacer()
-            Text(entry.discovered ? "\(entry.count)×" : "—")
-                .font(SwarmTheme.ui(14, .bold))
-                .foregroundColor(entry.discovered ? SwarmTheme.cyan : SwarmTheme.foam.opacity(0.3))
+            VStack(alignment: .trailing, spacing: 3) {
+                Text(entry.discovered ? "\(entry.count)×" : "—")
+                    .font(SwarmTheme.ui(14, .bold))
+                    .foregroundColor(entry.discovered ? SwarmTheme.cyan : SwarmTheme.foam.opacity(0.3))
+                if entry.record.deploymentCount > 0 {
+                    Text("\(entry.record.deploymentCount) deploys")
+                        .font(SwarmTheme.ui(9))
+                        .foregroundColor(SwarmTheme.foam.opacity(0.4))
+                }
+            }
         }
         .padding(12)
         .background(RoundedRectangle(cornerRadius: 12).fill(Color(white: 0.1)))
+    }
+
+    @ViewBuilder
+    private func notebookMeta(_ record: SpeciesNotebookRecord) -> some View {
+        HStack(spacing: 8) {
+            if record.sm5Count > 0 {
+                Text("SM5 \(record.sm5Count)")
+                    .font(SwarmTheme.ui(9, .bold))
+                    .foregroundColor(SwarmTheme.lime.opacity(0.75))
+            }
+            if record.sm5batCount > 0 {
+                Text("SM5BAT \(record.sm5batCount)")
+                    .font(SwarmTheme.ui(9, .bold))
+                    .foregroundColor(SwarmTheme.cyan.opacity(0.75))
+            }
+        }
     }
 }
 
@@ -611,6 +650,11 @@ struct PlayingFieldOverlay: View {
                         .transition(.opacity.combined(with: .move(edge: .top)))
                 }
                 Spacer()
+                if !model.recentVouchers.isEmpty {
+                    VoucherFeedStrip(vouchers: model.recentVouchers)
+                        .padding(.horizontal, 16)
+                        .padding(.bottom, 8)
+                }
                 if let hint = model.nextGoalHint {
                     Text(hint)
                         .font(SwarmTheme.ui(12, .semibold))
@@ -624,6 +668,35 @@ struct PlayingFieldOverlay: View {
             }
         }
         .animation(.easeOut(duration: 0.2), value: model.spectrogram)
+    }
+}
+
+private struct VoucherFeedStrip: View {
+    let vouchers: [DetectionVoucher]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("Recent vouchers")
+                .font(SwarmTheme.ui(9, .bold))
+                .foregroundColor(SwarmTheme.foam.opacity(0.45))
+            ForEach(vouchers) { v in
+                HStack(spacing: 6) {
+                    Image(systemName: v.validated ? "checkmark.seal.fill" : "questionmark.circle")
+                        .font(.system(size: 10))
+                        .foregroundColor(v.validated ? SwarmTheme.lime : SwarmTheme.red.opacity(0.7))
+                    Text(v.commonName)
+                        .font(SwarmTheme.ui(11, .semibold))
+                        .foregroundColor(SwarmTheme.foam.opacity(0.85))
+                    Spacer()
+                    Text("\(Int(v.confidence * 100))%")
+                        .font(SwarmTheme.ui(10, .bold))
+                        .foregroundColor(SwarmTheme.cyan.opacity(0.8))
+                }
+            }
+        }
+        .padding(10)
+        .background(RoundedRectangle(cornerRadius: 12).fill(Color.black.opacity(0.5)))
+        .overlay(RoundedRectangle(cornerRadius: 12).stroke(SwarmTheme.cyan.opacity(0.2), lineWidth: 1))
     }
 }
 

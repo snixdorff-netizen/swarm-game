@@ -21,6 +21,12 @@ final class GameCenterLogicTests: XCTestCase {
         XCTAssertFalse(GameCenterLogic.shouldSubmitLeaderboard(newBest: true, seconds: 0))
     }
 
+    func testShouldSubmitScoreLeaderboard() {
+        XCTAssertTrue(GameCenterLogic.shouldSubmitScoreLeaderboard(newBest: true, score: 1200))
+        XCTAssertFalse(GameCenterLogic.shouldSubmitScoreLeaderboard(newBest: false, score: 1200))
+        XCTAssertFalse(GameCenterLogic.shouldSubmitScoreLeaderboard(newBest: true, score: 0))
+    }
+
     func testPendingAfterSuccessfulSubmit() {
         XCTAssertNil(GameCenterLogic.pendingAfterSuccessfulSubmit(submitted: 90, pending: 90))
         XCTAssertEqual(GameCenterLogic.pendingAfterSuccessfulSubmit(submitted: 90, pending: 120), 120)

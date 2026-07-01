@@ -17,15 +17,15 @@ struct SurveyMission: Equatable, Codable {
             switch deployMode {
             case .sm5:
                 return [
-                    ("Dawn Chorus Baseline", "Document passerine vocal activity post-restoration.", 18, 4, 0.62, 480),
-                    ("Canopy Point Count", "Establish presence of forest songbirds along transect.", 22, 5, 0.58, 540),
-                    ("Wetland Dawn Survey", "Log low-frequency amphibian and owl vocalizations.", 16, 3, 0.60, 420),
+                    ("Dawn Chorus Baseline", "Document passerine vocal activity post-restoration.", 18, 4, 0.62, 540),
+                    ("Canopy Point Count", "Establish presence of forest songbirds along transect.", 22, 5, 0.58, 600),
+                    ("Wetland Dawn Survey", "Log low-frequency amphibian and owl vocalizations.", 16, 3, 0.60, 480),
                 ]
             case .sm5bat:
                 return [
-                    ("Bat Emergence Survey", "Confirm ultrasonic passes at corridor crossing.", 14, 3, 0.65, 480),
-                    ("SM5BAT Overnight Slice", "Inventory high-frequency contact calls before 8 min.", 12, 2, 0.68, 420),
-                    ("Endangered Acoustic Watch", "Target rare ultrasonic signature with high confidence.", 10, 2, 0.72, 540),
+                    ("Bat Emergence Survey", "Confirm ultrasonic passes at corridor crossing.", 14, 3, 0.65, 540),
+                    ("SM5BAT Overnight Slice", "Inventory high-frequency contact calls along transect.", 12, 2, 0.68, 480),
+                    ("Endangered Acoustic Watch", "Target rare ultrasonic signature with high confidence.", 10, 2, 0.72, 720),
                 ]
             }
         }()

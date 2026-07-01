@@ -8,12 +8,14 @@ import UIKit
 final class GameCenterManager: NSObject, ObservableObject {
     static let shared = GameCenterManager()
     static let leaderboardID = "ai.swarm.game.besttime"
+    static let surveyScoreLeaderboardID = "ai.swarm.game.surveyscore"
 
     @Published private(set) var statusLine: String = ""
     @Published private(set) var syncStatusLine: String = ""
     @Published private(set) var isAvailable: Bool = false
 
     private var pendingBestTime: Int?
+    private var pendingBestSurveyScore: Int?
     private var authHandlerInstalled = false
     private weak var pendingAuthVC: UIViewController?
     private var authRetryTask: Task<Void, Never>?
@@ -80,6 +82,19 @@ final class GameCenterManager: NSObject, ObservableObject {
         #endif
     }
 
+    func submitBestSurveyScore(_ score: Int) {
+        guard score > 0 else { return }
+        #if targetEnvironment(simulator)
+        return
+        #else
+        pendingBestSurveyScore = GameCenterLogic.mergedPending(existing: pendingBestSurveyScore, new: score)
+        if GameCenterLogic.shouldQueueSubmit(isAvailable: isAvailable, isAuthenticated: GKLocalPlayer.local.isAuthenticated) {
+            return
+        }
+        trySubmitPending()
+        #endif
+    }
+
     func retryPresentAuthIfNeeded() {
         guard let vc = pendingAuthVC else { return }
         presentAuth(vc)
@@ -92,13 +107,41 @@ final class GameCenterManager: NSObject, ObservableObject {
     }
 
     private func trySubmitPending() {
-        guard let pending = pendingBestTime,
-              isAvailable,
-              GKLocalPlayer.local.isAuthenticated else { return }
-        submitNow(pending)
+        guard isAvailable, GKLocalPlayer.local.isAuthenticated else { return }
+        if let pending = pendingBestSurveyScore {
+            submitScoreNow(pending)
+            return
+        }
+        if let pending = pendingBestTime {
+            submitTimeNow(pending)
+        }
     }
 
-    private func submitNow(_ seconds: Int) {
+    private func submitScoreNow(_ score: Int) {
+        GKLeaderboard.submitScore(
+            score,
+            context: 0,
+            player: GKLocalPlayer.local,
+            leaderboardIDs: [Self.surveyScoreLeaderboardID]
+        ) { [weak self] error in
+            Task { @MainActor in
+                guard let self else { return }
+                if let error {
+                    NSLog("Survey score leaderboard submit failed: %@", error.localizedDescription)
+                    self.pendingBestSurveyScore = GameCenterLogic.mergedPending(existing: self.pendingBestSurveyScore, new: score)
+                    self.syncStatusLine = "Leaderboard sync pending"
+                } else {
+                    self.pendingBestSurveyScore = GameCenterLogic.pendingAfterSuccessfulSubmit(
+                        submitted: score,
+                        pending: self.pendingBestSurveyScore
+                    )
+                    self.trySubmitPending()
+                }
+            }
+        }
+    }
+
+    private func submitTimeNow(_ seconds: Int) {
         GKLeaderboard.submitScore(
             seconds,
             context: 0,
@@ -116,7 +159,7 @@ final class GameCenterManager: NSObject, ObservableObject {
                         submitted: seconds,
                         pending: self.pendingBestTime
                     )
-                    if self.pendingBestTime == nil {
+                    if self.pendingBestTime == nil && self.pendingBestSurveyScore == nil {
                         self.syncStatusLine = ""
                     } else {
                         self.trySubmitPending()

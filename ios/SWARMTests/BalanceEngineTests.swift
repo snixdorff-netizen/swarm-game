@@ -75,4 +75,22 @@ final class BalanceEngineTests: XCTestCase {
     func testLeechHealMatchesGameSceneFormula() {
         XCTAssertEqual(BalanceEngine.leechHealOnKill(leechLevel: 2, metaLeech: 1), 7)
     }
+
+    func testSM5BATSpawnsMoreFastCallers() {
+        let sm5 = BalanceEngine.enemyKind(runTime: 20, roll: 0.4, deployMode: .sm5)
+        let bat = BalanceEngine.enemyKind(runTime: 20, roll: 0.4, deployMode: .sm5bat)
+        XCTAssertEqual(sm5, .basic)
+        XCTAssertEqual(bat, .fast)
+    }
+
+    func testSM5BATSpeciesArchetypeBiasesUltrasonic() {
+        let archetype = BalanceEngine.speciesArchetype(for: .basic, roll: 0.1, deployMode: .sm5bat)
+        XCTAssertEqual(archetype, EnemyKind.boss.rawValue)
+        let acoustic = BalanceEngine.speciesArchetype(for: .basic, roll: 0.9, deployMode: .sm5bat)
+        XCTAssertEqual(acoustic, EnemyKind.basic.rawValue)
+    }
+
+    func testFalsePositiveNoisePenaltyIsMeaningful() {
+        XCTAssertGreaterThanOrEqual(BalanceEngine.falsePositiveNoisePenalty, 12)
+    }
 }

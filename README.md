@@ -5,14 +5,16 @@
 > deployments, ultrasonic bat surveys, Kaleidoscope-style classification).
 
 Drag to reposition your **Song Meter** rig in the habitat. Auto-classifiers scan for hidden
-vocalizations; confirmed IDs drop **recording clips** you collect to rank up and expand your
-field kit. Stay quiet — habitat disturbance ends the deployment. Beat your best survey time.
+vocalizations; confirmed detections drop **recording clips** you collect to rank up and expand your
+field kit. Complete transect missions under protocol — noise budget ends the deployment early.
+Beat your best **survey score**.
 
 *Fan project / lineage game — not affiliated with Wildlife Acoustics, Inc.*
 
 ## Status
-- **Beta-ready (0.9.0)** — TestFlight tooling, unit tests, CI, Game Center leaderboard, shareable survey card, settings.
-- **Bioacoustic conversion** — fauna fade until detection range; call-ring VFX; SM5BAT-class rare event @ 90s.
+- **Beta-ready (0.9.0)** — TestFlight tooling, unit tests, CI, Game Center survey-score leaderboard, shareable survey card, settings.
+- **P0 trust wave** — protocol vocabulary, mission briefs, mini-spectrogram waterfall, 12 project species, survey scoring.
+- **P1 meaning wave** — detection vouchers, study notebook catalog, false-positive mimic penalty, SM5BAT night palette, report export.
 - **Meta-progression** — earn survey grants each deployment, spend in Field Lab on permanent rig upgrades.
 
 ## Gameplay

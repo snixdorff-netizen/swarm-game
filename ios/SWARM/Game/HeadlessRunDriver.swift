@@ -23,6 +23,7 @@ enum HeadlessRunDriver {
         let view = SKView(frame: CGRect(x: 0, y: 0, width: 430, height: 932))
         let store = meta ?? MetaStore(defaults: isolatedDefaults(seed: seed))
         let model = GameModel(meta: store)
+        model.setDeployMode(.sm5)
         let scene = GameScene(size: CGSize(width: 430, height: 932))
         scene.model = model
         scene.testing_attach(to: view)
