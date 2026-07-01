@@ -63,18 +63,21 @@ enum HeadlessRunDriver {
         return run(profile: profile, seed: baseSeed, maxSeconds: maxSeconds, mode: .mortal)
     }
 
-    /// Scan seeded mortal runs until boss spawn (≥90s survival or death after boss).
+    /// Scan seeded mortal runs until rare species event with post-event expedition end.
     static func probeMortalBoss(
         profile: BuildProfile = .leechTank,
         baseSeed: UInt64 = 8081,
-        scan: Int = 24,
+        scan: Int = 32,
         maxSeconds: Int = 120,
         meta: MetaStore? = nil
     ) -> GameSceneRunSummary {
+        var bossOnly: GameSceneRunSummary?
         for offset in 0..<scan {
             let summary = run(profile: profile, seed: baseSeed &+ UInt64(offset), maxSeconds: maxSeconds, meta: meta, mode: .mortal)
-            if summary.bossSpawned { return summary }
+            if summary.bossSpawned && summary.died { return summary }
+            if summary.bossSpawned, bossOnly == nil { bossOnly = summary }
         }
+        if let bossOnly { return bossOnly }
         return run(profile: profile, seed: baseSeed, maxSeconds: maxSeconds, meta: meta, mode: .mortal)
     }
 

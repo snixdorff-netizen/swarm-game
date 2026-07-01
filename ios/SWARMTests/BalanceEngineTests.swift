@@ -35,22 +35,28 @@ final class BalanceEngineTests: XCTestCase {
     }
 
     func testMilestoneBanners() {
-        XCTAssertEqual(BalanceEngine.milestoneBanner(for: 30), "30 SECONDS — KEEP GOING")
+        XCTAssertEqual(BalanceEngine.milestoneBanner(for: 30), "30s — BASELINE LOCKED")
         XCTAssertNil(BalanceEngine.milestoneBanner(for: 45))
     }
 
     func testBossTeaseAndKillStreakBanners() {
-        XCTAssertEqual(BalanceEngine.bossTeaseBanner(), "BOSS IN 15 SECONDS")
-        XCTAssertEqual(BalanceEngine.killStreakBanner(for: 25), "25 KILLS — ON FIRE")
-        XCTAssertEqual(BalanceEngine.killStreakBanner(for: 50), "50 KILLS — UNSTOPPABLE")
+        XCTAssertEqual(BalanceEngine.bossTeaseBanner(), "RARE SPECIES IN 15s")
+        XCTAssertEqual(BalanceEngine.killStreakBanner(for: 25), "25 IDs — STRONG INVENTORY")
+        XCTAssertEqual(BalanceEngine.killStreakBanner(for: 50), "50 IDs — CATALOG SURGE")
         XCTAssertNil(BalanceEngine.killStreakBanner(for: 24))
     }
 
     func testNextGoalHintGuidesCasualPlayers() {
-        XCTAssertEqual(BalanceEngine.nextGoalHint(timeSec: 10, kills: 0), "Goal: survive 0:30")
-        XCTAssertEqual(BalanceEngine.nextGoalHint(timeSec: 45, kills: 5), "Goal: reach 1:00")
-        XCTAssertEqual(BalanceEngine.nextGoalHint(timeSec: 80, kills: 10), "Goal: boss at 1:30")
-        XCTAssertEqual(BalanceEngine.nextGoalHint(timeSec: 95, kills: 30), "Goal: 50-kill streak")
+        XCTAssertEqual(BalanceEngine.nextGoalHint(timeSec: 10, kills: 0), "Goal: establish 0:30 baseline")
+        XCTAssertEqual(BalanceEngine.nextGoalHint(timeSec: 45, kills: 5), "Goal: reach 1:00 inventory")
+        XCTAssertEqual(BalanceEngine.nextGoalHint(timeSec: 80, kills: 10), "Goal: rare species at 1:30")
+        XCTAssertEqual(BalanceEngine.nextGoalHint(timeSec: 95, kills: 30), "Goal: 50 confirmed IDs")
+    }
+
+    func testDetectionRadiusGrowsWithKit() {
+        let base = BalanceEngine.detectionRadius(pickupRadius: 78, orbitLevel: 0, chainLevel: 0)
+        let expanded = BalanceEngine.detectionRadius(pickupRadius: 114, orbitLevel: 2, chainLevel: 2)
+        XCTAssertGreaterThan(expanded, base)
     }
 
     func testBossSpawnAtNinety() {

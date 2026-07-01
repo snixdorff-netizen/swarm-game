@@ -1,9 +1,8 @@
-// SWARM — the gameplay scene. Top-down roguelite survivor:
-// move with a floating joystick, weapons auto-fire, hordes chase you, kills drop XP,
-// level up to pick build upgrades. Escalating difficulty until you die.
+// SWARM Acoustic Field — bioacoustic survey deployment (Wildlife Acoustics–inspired workflow):
+// move your Song Meter rig, auto-classifiers scan hidden fauna, confirmed IDs drop recording clips,
+// rank up to choose field kit modules. Habitat disturbance ends the deployment.
 //
-// Rendered in flat neon geometry (no art assets needed). Camera follows the player; HUD
-// is attached to the camera so it stays fixed on screen.
+// Fauna are faint until within acoustic detection range. Flat geometry — no art assets required.
 
 import SpriteKit
 
@@ -53,18 +52,19 @@ private final class Gem {
 
 // MARK: - Palette
 private enum C {
-    static let bg = SKColor(red: 0.04, green: 0.04, blue: 0.07, alpha: 1)
-    static let grid = SKColor(red: 0.12, green: 0.13, blue: 0.22, alpha: 1)
-    static let player = SKColor(red: 0.20, green: 0.88, blue: 1.0, alpha: 1)
-    static let bolt = SKColor(red: 0.85, green: 0.97, blue: 1.0, alpha: 1)
-    static let basic = SKColor(red: 1.0, green: 0.30, blue: 0.42, alpha: 1)
-    static let fast = SKColor(red: 1.0, green: 0.66, blue: 0.30, alpha: 1)
-    static let tank = SKColor(red: 0.69, green: 0.42, blue: 1.0, alpha: 1)
-    static let shooter = SKColor(red: 1.0, green: 0.45, blue: 0.75, alpha: 1)
-    static let boss = SKColor(red: 0.95, green: 0.15, blue: 0.55, alpha: 1)
-    static let gem = SKColor(red: 0.71, green: 1.0, blue: 0.36, alpha: 1)
-    static let chain = SKColor(red: 0.55, green: 0.75, blue: 1.0, alpha: 1)
-    static let orbit = SKColor(red: 0.20, green: 0.88, blue: 1.0, alpha: 1)
+    static let bg = SKColor(red: 0.03, green: 0.06, blue: 0.05, alpha: 1)
+    static let grid = SKColor(red: 0.08, green: 0.14, blue: 0.11, alpha: 1)
+    static let player = SKColor(red: 0.35, green: 0.85, blue: 0.55, alpha: 1)
+    static let bolt = SKColor(red: 0.55, green: 0.95, blue: 0.85, alpha: 1)
+    static let basic = SKColor(red: 0.45, green: 0.72, blue: 0.38, alpha: 1)
+    static let fast = SKColor(red: 0.72, green: 0.88, blue: 0.42, alpha: 1)
+    static let tank = SKColor(red: 0.28, green: 0.55, blue: 0.42, alpha: 1)
+    static let shooter = SKColor(red: 0.55, green: 0.65, blue: 0.95, alpha: 1)
+    static let boss = SKColor(red: 0.85, green: 0.45, blue: 1.0, alpha: 1)
+    static let gem = SKColor(red: 0.40, green: 0.92, blue: 0.68, alpha: 1)
+    static let chain = SKColor(red: 0.55, green: 0.82, blue: 0.95, alpha: 1)
+    static let orbit = SKColor(red: 0.40, green: 0.88, blue: 0.62, alpha: 1)
+    static let clarity = SKColor(red: 0.95, green: 0.78, blue: 0.28, alpha: 1)
 }
 
 final class GameScene: SKScene {
@@ -198,19 +198,19 @@ final class GameScene: SKScene {
 
     private func buildPlayer() {
         let r: CGFloat = 13
-        let path = CGMutablePath()
-        path.move(to: CGPoint(x: r * 1.3, y: 0))
-        path.addLine(to: CGPoint(x: -r, y: r * 0.85))
-        path.addLine(to: CGPoint(x: -r * 0.4, y: 0))
-        path.addLine(to: CGPoint(x: -r, y: -r * 0.85))
-        path.closeSubpath()
-        player = SKShapeNode(path: path)
+        player = SKShapeNode(rectOf: CGSize(width: r * 2.4, height: r * 1.7), cornerRadius: 4)
         player.fillColor = C.player
         player.strokeColor = .white
         player.lineWidth = 1.5
-        player.glowWidth = 4
+        player.glowWidth = 3
         player.zPosition = 5
         addChild(player)
+        let mic = SKShapeNode(circleOfRadius: 3.5)
+        mic.fillColor = .white
+        mic.strokeColor = .clear
+        mic.position = CGPoint(x: 0, y: r * 0.35)
+        mic.zPosition = 1
+        player.addChild(mic)
         novaRing = SKShapeNode(circleOfRadius: novaRadius)
         novaRing.strokeColor = C.orbit.withAlphaComponent(0.0)
         novaRing.lineWidth = 2; novaRing.zPosition = 3
@@ -225,7 +225,7 @@ final class GameScene: SKScene {
             let n = SKShapeNode(rectOf: CGSize(width: 1, height: 1), cornerRadius: 3)
             n.fillColor = color; n.strokeColor = .clear; return n
         }
-        hpBarBg = bar(SKColor(white: 1, alpha: 0.12)); hpBar = bar(SKColor(red: 0.95, green: 0.25, blue: 0.35, alpha: 1))
+        hpBarBg = bar(SKColor(white: 1, alpha: 0.12)); hpBar = bar(C.clarity)
         xpBarBg = bar(SKColor(white: 1, alpha: 0.12)); xpBar = bar(C.player)
         [hpBarBg, hpBar, xpBarBg, xpBar].forEach { $0.zPosition = 50; cam.addChild($0) }
         timeLabel = label(34, weight: .heavy); killLabel = label(14, weight: .medium); lvlLabel = label(14, weight: .medium)
@@ -516,7 +516,18 @@ final class GameScene: SKScene {
         }
         let node = SKSpriteNode(color: color, size: CGSize(width: sz, height: sz))
         node.position = pos; node.zRotation = kind == .shooter ? 0 : .pi/4; node.zPosition = kind == .boss ? 6 : 2
+        node.alpha = 0.12
         addChild(node)
+        let ring = SKShapeNode(circleOfRadius: stats.radius + 10)
+        ring.strokeColor = color.withAlphaComponent(0.45)
+        ring.lineWidth = 1.2
+        ring.fillColor = .clear
+        ring.zPosition = 1
+        node.addChild(ring)
+        ring.run(.repeatForever(.sequence([
+            .group([.scale(to: 1.22, duration: 0.9), .fadeAlpha(to: 0.25, duration: 0.9)]),
+            .group([.scale(to: 1.0, duration: 0.9), .fadeAlpha(to: 0.55, duration: 0.9)])
+        ])))
         enemies.append(Enemy(node: node, hp: stats.hp, speed: stats.speed, radius: stats.radius, dmg: stats.damage, xp: stats.xp, kind: kind.rawValue))
     }
 
@@ -528,12 +539,13 @@ final class GameScene: SKScene {
 
     private func spawnBoss() {
         SfxPlayer.shared.boss(); Haptics.shared.boss()
-        model?.runBanner = "⚠ BOSS INCOMING"
-        bossWarnLabel.text = "⚠ BOSS INCOMING"
+        let rareBanner = "⚠ ENDANGERED ULTRASONIC"
+        model?.runBanner = rareBanner
+        bossWarnLabel.text = "⚠ SM5BAT-CLASS SIGNAL"
         bossWarnLabel.isHidden = false
         bossWarnLabel.run(.sequence([.wait(forDuration: 2.2), .fadeOut(withDuration: 0.4), .run { [weak self] in
             self?.bossWarnLabel.isHidden = true; self?.bossWarnLabel.alpha = 1
-            if self?.model?.runBanner == "⚠ BOSS INCOMING" { self?.model?.runBanner = nil }
+            if self?.model?.runBanner == rareBanner { self?.model?.runBanner = nil }
         }]))
         let ang = spawnUnit() * (2 * .pi)
         let dist = max(size.width, size.height) * 0.5
@@ -547,9 +559,12 @@ final class GameScene: SKScene {
 
     private func updateEnemies(_ dt: CGFloat) {
         let chaseMult = 1 + min(0.85, runTime * 0.01)
+        let detectR = BalanceEngine.detectionRadius(pickupRadius: pickupRadius, orbitLevel: orbitLevel, chainLevel: chainLevel)
         for e in enemies {
             let dx = pPos.x - e.node.position.x, dy = pPos.y - e.node.position.y
             let d = max(1, (dx*dx + dy*dy).squareRoot())
+            let visibility = min(1, max(0.1, 1.15 - d / detectR))
+            e.node.alpha = e.kind == EnemyKind.boss.rawValue ? max(0.35, visibility) : visibility
             if e.kind == 3 {
                 let keep = e.radius + 140
                 if d < keep { e.node.position.x -= dx/d * e.speed * dt; e.node.position.y -= dy/d * e.speed * dt }
@@ -773,9 +788,13 @@ final class GameScene: SKScene {
         ]))
     }
     private func kill(_ e: Enemy) {
+        let species = SurveySpecies.from(enemyKind: e.kind)
         e.node.removeFromParent()
         if let idx = enemies.firstIndex(where: { $0 === e }) { enemies.remove(at: idx) }
         kills += 1; model?.kills = kills
+        if runTime < CGFloat(BalanceEngine.bossTeaseSeconds) || runTime >= BalanceEngine.bossSpawnSeconds {
+            showRunBanner("ID: \(species.displayName)", pulse: false, duration: 1.2)
+        }
         checkKillStreak(kills)
         let leech = CGFloat(leechLevel) * 5 + leechPerKill * 1.25
         if leech > 0 { hp = min(maxHp, hp + leech) }
@@ -865,21 +884,14 @@ final class GameScene: SKScene {
     }
     private func pickChoices() -> [UpgradeCard] {
         var pool: [UpgradeCard] = []
-        pool.append(UpgradeCard(id: "bolt_dmg", title: "Sharper Bolts", subtitle: "+7 bolt damage", symbol: "bolt.fill", levelText: ""))
-        pool.append(UpgradeCard(id: "bolt_rate", title: "Rapid Fire", subtitle: "Fire faster", symbol: "forward.fill", levelText: ""))
-        pool.append(UpgradeCard(id: "bolt_count", title: "Split Shot", subtitle: "+1 bolt per volley", symbol: "arrow.up.and.down.and.arrow.left.and.right", levelText: ""))
-        if boltPierce < 4 { pool.append(UpgradeCard(id: "bolt_pierce", title: "Piercing", subtitle: "Bolts pass through +1", symbol: "arrow.right.to.line", levelText: "")) }
-        pool.append(UpgradeCard(id: orbitLevel == 0 ? "orbit" : "orbit", title: orbitLevel == 0 ? "Orbital Blades" : "More Blades", subtitle: orbitLevel == 0 ? "Spinning blades guard you" : "+1 orbiting blade", symbol: "circle.dashed", levelText: orbitLevel == 0 ? "NEW" : "Lv \(orbitLevel+1)"))
-        if orbitLevel > 0 { pool.append(UpgradeCard(id: "orbit_dmg", title: "Heavy Blades", subtitle: "+blade damage", symbol: "circle.hexagongrid.fill", levelText: "")) }
-        pool.append(UpgradeCard(id: novaLevel == 0 ? "nova" : "nova", title: novaLevel == 0 ? "Shock Nova" : "Faster Nova", subtitle: novaLevel == 0 ? "Pulse damages nearby foes" : "Pulse more often", symbol: "wave.3.right", levelText: novaLevel == 0 ? "NEW" : "Lv \(novaLevel+1)"))
-        if novaLevel > 0 { pool.append(UpgradeCard(id: "nova_radius", title: "Wide Nova", subtitle: "+pulse radius", symbol: "circle.circle", levelText: "")) }
-        pool.append(UpgradeCard(id: "max_hp", title: "Vitality", subtitle: "+25 max health", symbol: "heart.fill", levelText: ""))
-        pool.append(UpgradeCard(id: "move", title: "Swift Feet", subtitle: "+move speed", symbol: "figure.run", levelText: ""))
-        pool.append(UpgradeCard(id: "pickup", title: "Magnet", subtitle: "+pickup range", symbol: "scope", levelText: ""))
-        if regen < 6 { pool.append(UpgradeCard(id: "regen", title: "Regeneration", subtitle: "Heal over time", symbol: "cross.case.fill", levelText: "")) }
-        pool.append(UpgradeCard(id: chainLevel == 0 ? "chain" : "chain", title: chainLevel == 0 ? "Chain Lightning" : "Faster Arc", subtitle: chainLevel == 0 ? "Zap chains between foes" : "Arc more often", symbol: "bolt.horizontal.fill", levelText: chainLevel == 0 ? "NEW" : "Lv \(chainLevel+1)"))
-        if chainLevel > 0 { pool.append(UpgradeCard(id: "chain_dmg", title: "High Voltage", subtitle: "+chain damage", symbol: "bolt.circle.fill", levelText: "")) }
-        pool.append(UpgradeCard(id: leechLevel == 0 ? "leech" : "leech", title: leechLevel == 0 ? "Vampiric Leech" : "Stronger Leech", subtitle: leechLevel == 0 ? "Heal on kill" : "+heal per kill", symbol: "drop.fill", levelText: leechLevel == 0 ? "NEW" : "Lv \(leechLevel+1)"))
+        for id in AcousticFieldCatalog.kitPoolIds {
+            if let card = AcousticFieldCatalog.kitCard(
+                id: id, orbitLevel: orbitLevel, novaLevel: novaLevel, chainLevel: chainLevel,
+                leechLevel: leechLevel, boltPierce: boltPierce, regen: regen
+            ) {
+                pool.append(card)
+            }
+        }
         pool.shuffle()
         return Array(pool.prefix(3))
     }
@@ -892,8 +904,8 @@ final class GameScene: SKScene {
         let sec = Int(runTime)
         model?.nextGoalHint = BalanceEngine.nextGoalHint(timeSec: sec, kills: kills)
         timeLabel.text = String(format: "%d:%02d", sec / 60, sec % 60)
-        killLabel.text = "\(kills) kills"
-        lvlLabel.text = "LV \(level)"
+        killLabel.text = "\(kills) IDs"
+        lvlLabel.text = "RANK \(level)"
         layoutHUD()
     }
 

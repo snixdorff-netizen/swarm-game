@@ -104,7 +104,7 @@ final class GameSceneCombatTests: XCTestCase {
         let (scene, model, _) = makeScene()
         scene.testingPlayerInvulnerable = true
         scene.testing_fastForward(seconds: 76)
-        XCTAssertEqual(model.runBanner, "BOSS IN 15 SECONDS")
+        XCTAssertEqual(model.runBanner, "RARE SPECIES IN 15s")
     }
 
     func testMilestone30MortalCasual() {

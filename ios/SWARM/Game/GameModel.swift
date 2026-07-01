@@ -32,7 +32,7 @@ final class GameModel: ObservableObject {
     @Published var coresEarned: Int = 0
     @Published var runBanner: String?
     @Published var nextGoalHint: String?
-    @Published var deathHeadline: String = "YOU DIED"
+    @Published var deathHeadline: String = "SURVEY ENDED"
     @Published var deathSubline: String = ""
     @Published var runWasNewBest: Bool = false
 
@@ -57,7 +57,7 @@ final class GameModel: ObservableObject {
     func start() {
         runBanner = nil
         nextGoalHint = nil
-        deathHeadline = "YOU DIED"
+        deathHeadline = "SURVEY ENDED"
         deathSubline = ""
         runWasNewBest = false
         onStart()

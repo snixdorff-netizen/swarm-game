@@ -13,17 +13,17 @@ struct MetaUpgrade: Identifiable {
 
 enum MetaCatalog {
     static let all: [MetaUpgrade] = [
-        MetaUpgrade(id: "meta_dmg", title: "Overclock", subtitle: "+4% weapon damage", symbol: "bolt.fill", maxLevel: 10,
+        MetaUpgrade(id: "meta_dmg", title: "Amp Gain Module", subtitle: "+4% classifier sensitivity", symbol: "waveform.path", maxLevel: 10,
                     cost: { lv in 8 + lv * 6 }),
-        MetaUpgrade(id: "meta_hp", title: "Reinforced Hull", subtitle: "+8 max HP", symbol: "heart.fill", maxLevel: 10,
+        MetaUpgrade(id: "meta_hp", title: "Rugged Song Meter Housing", subtitle: "+8 signal clarity", symbol: "shield.lefthalf.filled", maxLevel: 10,
                     cost: { lv in 6 + lv * 5 }),
-        MetaUpgrade(id: "meta_speed", title: "Thrusters", subtitle: "+3% move speed", symbol: "figure.run", maxLevel: 8,
+        MetaUpgrade(id: "meta_speed", title: "Quiet Trek Boots", subtitle: "+3% deploy speed", symbol: "figure.walk", maxLevel: 8,
                     cost: { lv in 7 + lv * 5 }),
-        MetaUpgrade(id: "meta_magnet", title: "Gravity Well", subtitle: "+6 pickup range", symbol: "scope", maxLevel: 8,
+        MetaUpgrade(id: "meta_magnet", title: "Kaleidoscope Reach", subtitle: "+6 clip collection range", symbol: "scope", maxLevel: 8,
                     cost: { lv in 5 + lv * 4 }),
-        MetaUpgrade(id: "meta_xp", title: "Data Harvest", subtitle: "+4% XP from kills", symbol: "sparkles", maxLevel: 8,
+        MetaUpgrade(id: "meta_xp", title: "Catalog Accelerator", subtitle: "+4% recording XP", symbol: "sparkles", maxLevel: 8,
                     cost: { lv in 6 + lv * 4 }),
-        MetaUpgrade(id: "meta_leech", title: "Siphon Core", subtitle: "+1 HP on kill", symbol: "drop.fill", maxLevel: 5,
+        MetaUpgrade(id: "meta_leech", title: "Passive Monitor", subtitle: "+1 clarity per confirmed ID", symbol: "antenna.radiowaves.left.and.right", maxLevel: 5,
                     cost: { lv in 10 + lv * 7 }),
     ]
 }

@@ -67,31 +67,36 @@ enum BalanceEngine {
 
     static func milestoneBanner(for seconds: Int) -> String? {
         switch seconds {
-        case 30: return "30 SECONDS — KEEP GOING"
-        case 60: return "1 MINUTE — HORDE RISING"
+        case 30: return "30s — BASELINE LOCKED"
+        case 60: return "1:00 — VOCAL ACTIVITY RISING"
         default: return nil
         }
     }
 
-    static func bossTeaseBanner() -> String { "BOSS IN 15 SECONDS" }
+    static func bossTeaseBanner() -> String { "RARE SPECIES IN 15s" }
 
     static func killStreakBanner(for kills: Int) -> String? {
         switch kills {
-        case 25: return "25 KILLS — ON FIRE"
-        case 50: return "50 KILLS — UNSTOPPABLE"
-        case 100: return "100 KILLS — SWARM SLAYER"
+        case 25: return "25 IDs — STRONG INVENTORY"
+        case 50: return "50 IDs — CATALOG SURGE"
+        case 100: return "100 IDs — FULL SPECTRUM"
         default: return nil
         }
+    }
+
+    /// Song Meter + classifier modules extend acoustic detection range (fauna visibility).
+    static func detectionRadius(pickupRadius: CGFloat, orbitLevel: Int, chainLevel: Int) -> CGFloat {
+        110 + pickupRadius * 0.55 + CGFloat(orbitLevel) * 28 + CGFloat(chainLevel) * 16
     }
 
     /// Casual-friendly hint for the in-run HUD (what to chase next).
     static func nextGoalHint(timeSec: Int, kills: Int) -> String {
-        if timeSec < 30 { return "Goal: survive 0:30" }
-        if timeSec < bossTeaseSeconds { return "Goal: reach 1:00" }
-        if timeSec < Int(bossSpawnSeconds) { return "Goal: boss at 1:30" }
-        if kills < 25 { return "Goal: 25-kill streak" }
-        if kills < 50 { return "Goal: 50-kill streak" }
-        return "Goal: outlast the boss"
+        if timeSec < 30 { return "Goal: establish 0:30 baseline" }
+        if timeSec < bossTeaseSeconds { return "Goal: reach 1:00 inventory" }
+        if timeSec < Int(bossSpawnSeconds) { return "Goal: rare species at 1:30" }
+        if kills < 25 { return "Goal: 25 confirmed IDs" }
+        if kills < 50 { return "Goal: 50 confirmed IDs" }
+        return "Goal: log endangered ultrasonic"
     }
 
     // MARK: - Combat pressure (mirrors GameScene contact + shooter cadence)

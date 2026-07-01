@@ -55,14 +55,16 @@ struct MenuOverlay: View {
                     .font(SwarmTheme.title(76)).foregroundColor(SwarmTheme.cyan)
                     .tracking(6)
                     .shadow(color: SwarmTheme.cyan.opacity(0.7), radius: 18)
-                Text("Outlast the horde.")
-                    .font(SwarmTheme.ui(18)).foregroundColor(SwarmTheme.foam.opacity(0.8))
+                Text(AcousticFieldCopy.subtitle)
+                    .font(SwarmTheme.ui(16)).foregroundColor(SwarmTheme.foam.opacity(0.75))
+                Text(AcousticFieldCopy.tagline)
+                    .font(SwarmTheme.ui(14, .semibold)).foregroundColor(SwarmTheme.lime.opacity(0.85))
                 HStack(spacing: 16) {
                     if model.bestTime > 0 {
                         Text("Best: \(timeStr(model.bestTime))")
                             .font(SwarmTheme.ui(14)).foregroundColor(SwarmTheme.lime)
                     }
-                    Text("\(model.cores) cores")
+                    Text("\(model.cores) \(AcousticFieldCopy.grantsLabel)")
                         .font(SwarmTheme.ui(14, .bold)).foregroundColor(SwarmTheme.cyan)
                 }.padding(.top, 4)
                 Text(gameCenter.statusLine)
@@ -78,10 +80,10 @@ struct MenuOverlay: View {
                     if !seenHint {
                         FirstRunHint { seenHint = true }
                     }
-                    Button("Play") { model.start() }.buttonStyle(NeonButton())
-                    Button("Upgrades") { model.openMeta() }.buttonStyle(NeonButton(tint: Color(white: 0.22)))
+                    Button(AcousticFieldCopy.deployButton) { model.start() }.buttonStyle(NeonButton())
+                    Button(AcousticFieldCopy.fieldLabButton) { model.openMeta() }.buttonStyle(NeonButton(tint: Color(white: 0.22)))
                     if seenHint {
-                        Text("Drag to move · weapons fire on their own · grab the green to level up")
+                        Text("Drag to move · classifiers scan automatically · collect green recording clips")
                             .font(SwarmTheme.ui(12)).foregroundColor(SwarmTheme.foam.opacity(0.5))
                             .multilineTextAlignment(.center)
                     }
@@ -97,7 +99,7 @@ private struct FirstRunHint: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Text("Quick start")
+                Text("Field briefing")
                     .font(SwarmTheme.ui(14, .bold))
                     .foregroundColor(SwarmTheme.lime)
                 Spacer()
@@ -126,10 +128,10 @@ struct LevelUpOverlay: View {
         ZStack {
             Color.black.opacity(0.62).ignoresSafeArea()
             VStack(spacing: 16) {
-                Text("LEVEL \(model.level)")
+                Text("RANK \(model.level)")
                     .font(SwarmTheme.title(40)).foregroundColor(SwarmTheme.lime)
                     .shadow(color: SwarmTheme.lime.opacity(0.6), radius: 12)
-                Text("Power spike — pick your path")
+                Text("New kit module — expand your survey rig")
                     .font(SwarmTheme.ui(15)).foregroundColor(SwarmTheme.foam.opacity(0.7))
                 VStack(spacing: 12) {
                     ForEach(model.choices) { c in
@@ -195,7 +197,7 @@ struct GameOverOverlay: View {
                     .font(SwarmTheme.title(model.runWasNewBest ? 46 : 52))
                     .foregroundColor(model.runWasNewBest ? SwarmTheme.lime : SwarmTheme.red)
                     .shadow(color: (model.runWasNewBest ? SwarmTheme.lime : SwarmTheme.red).opacity(0.6), radius: 16)
-                Text("Survived \(timeStr(model.timeSec))")
+                Text("Deployed \(timeStr(model.timeSec))")
                     .font(SwarmTheme.ui(22, .bold)).foregroundColor(SwarmTheme.foam).padding(.top, 6)
                 if !model.deathSubline.isEmpty {
                     Text(model.deathSubline)
@@ -206,17 +208,17 @@ struct GameOverOverlay: View {
                         .padding(.top, 4)
                 }
                 HStack(spacing: 22) {
-                    stat("\(model.kills)", "kills")
-                    stat("LV \(model.level)", "reached")
+                    stat("\(model.kills)", "confirmed")
+                    stat("RANK \(model.level)", "reached")
                     stat(timeStr(model.bestTime), "best")
                 }.padding(.top, 14)
                 if model.coresEarned > 0 {
-                    Text("+\(model.coresEarned) cores")
+                    Text("+\(model.coresEarned) survey grants")
                         .font(SwarmTheme.ui(16, .bold)).foregroundColor(SwarmTheme.cyan).padding(.top, 6)
                 }
                 Spacer()
                 VStack(spacing: 12) {
-                    Button("Run again") { model.start() }.buttonStyle(NeonButton(tint: SwarmTheme.cyan))
+                    Button("Deploy again") { model.start() }.buttonStyle(NeonButton(tint: SwarmTheme.cyan))
                     Button("Share") { presentShare() }.buttonStyle(NeonButton(tint: SwarmTheme.lime))
                     Button("Menu") { model.restart() }.buttonStyle(NeonButton(tint: Color(white: 0.3)))
                 }.padding(.horizontal, 36).padding(.bottom, 48)
@@ -225,7 +227,7 @@ struct GameOverOverlay: View {
         .onAppear { cacheShareImage() }
         .sheet(isPresented: $showShare, onDismiss: { shareImage = nil }) {
             if let shareImage {
-                ActivityShareSheet(items: [shareImage, "Outlast the horde — SWARM"])
+                ActivityShareSheet(items: [shareImage, AcousticFieldCopy.shareTagline])
             }
         }
         .alert("Couldn't create share image", isPresented: $shareFailed) {
@@ -267,15 +269,15 @@ struct MetaOverlay: View {
             SwarmTheme.bg.opacity(0.94).ignoresSafeArea()
             VStack(spacing: 12) {
                 HStack {
-                    Text("UPGRADES")
+                    Text("FIELD LAB")
                         .font(SwarmTheme.title(32)).foregroundColor(SwarmTheme.cyan)
                     Spacer()
-                    Text("\(meta.cores) cores")
+                    Text("\(meta.cores) grants")
                         .font(SwarmTheme.ui(16, .bold)).foregroundColor(SwarmTheme.lime)
                 }
                 .padding(.horizontal, 22).padding(.top, 20)
 
-                Text("Permanent bonuses apply every run")
+                Text("Permanent rig upgrades for every deployment")
                     .font(SwarmTheme.ui(13)).foregroundColor(SwarmTheme.foam.opacity(0.55))
 
                 ScrollView {
@@ -349,7 +351,7 @@ struct SettingsOverlay: View {
                     .padding(.top, 28)
 
                 VStack(spacing: 12) {
-                    settingsToggle("Sound", isOn: $soundOn)
+                    settingsToggle("Field Audio", isOn: $soundOn)
                     settingsToggle("Haptics", isOn: $hapticsOn)
                 }
                 .padding(.horizontal, 28)

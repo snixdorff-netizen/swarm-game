@@ -1,4 +1,4 @@
-// Renders a shareable death-summary card for UIActivityViewController.
+// Renders a shareable survey-summary card for UIActivityViewController.
 
 import SwiftUI
 
@@ -20,15 +20,18 @@ struct DeathShareCardView: View {
                     .font(SwarmTheme.title(44))
                     .foregroundColor(SwarmTheme.cyan)
                     .tracking(4)
-                Text("I survived \(timeStr(payload.timeSec))")
+                Text(AcousticFieldCopy.subtitle)
+                    .font(SwarmTheme.ui(13, .semibold))
+                    .foregroundColor(SwarmTheme.lime.opacity(0.85))
+                Text("Deployed \(timeStr(payload.timeSec))")
                     .font(SwarmTheme.ui(26, .bold))
                     .foregroundColor(SwarmTheme.foam)
                 HStack(spacing: 28) {
-                    shareStat("\(payload.kills)", "kills")
-                    shareStat("LV \(payload.level)", "reached")
+                    shareStat("\(payload.kills)", "confirmed")
+                    shareStat("RANK \(payload.level)", "reached")
                     shareStat(timeStr(payload.bestTime), "best")
                 }
-                Text("Outlast the horde.")
+                Text(AcousticFieldCopy.tagline)
                     .font(SwarmTheme.ui(14))
                     .foregroundColor(SwarmTheme.foam.opacity(0.55))
             }

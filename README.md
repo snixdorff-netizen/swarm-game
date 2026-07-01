@@ -1,102 +1,65 @@
-# SWARM
+# SWARM — Acoustic Field
 
-> Outlast the horde. A native-iOS roguelite survivor (Vampire Survivors lineage), built in
-> Swift + SpriteKit.
+> **We listen.** A native-iOS bioacoustic field survey game inspired by professional wildlife
+> monitoring workflows ([Wildlife Acoustics](https://www.wildlifeacoustics.com) — Song Meter
+> deployments, ultrasonic bat surveys, Kaleidoscope-style classification).
 
-You drag to move; your weapons fire on their own. Enemies pour in from every side, drop XP when
-they die, and you level up to pick build-defining upgrades. The longer you last, the deadlier it
-gets. One life. Beat your best time.
+Drag to reposition your **Song Meter** rig in the habitat. Auto-classifiers scan for hidden
+vocalizations; confirmed IDs drop **recording clips** you collect to rank up and expand your
+field kit. Stay quiet — habitat disturbance ends the deployment. Beat your best survey time.
+
+*Fan project / lineage game — not affiliated with Wildlife Acoustics, Inc.*
 
 ## Status
-- **Beta-ready (0.9.0)** — TestFlight tooling, unit tests, CI, Game Center leaderboard, shareable death card, settings.
-- **Real, working iOS app** — compiles, runs on simulator, full loop:
-  menu → play → level-up choices → death → stats → retry.
-- Flat neon geometry (no art-asset dependency), camera-follow world, in-scene HUD.
-- **Meta-progression** — earn cores each run, spend them on permanent upgrades between runs.
-- **Juice** — procedural SFX, Core Haptics, floating damage numbers, survival milestones (30s/60s), boss at 90s.
-- **Balance tooling** — `BalanceEngine` + `RunSimulator` batch metrics for tuning (40 unit tests).
+- **Beta-ready (0.9.0)** — TestFlight tooling, unit tests, CI, Game Center leaderboard, shareable survey card, settings.
+- **Bioacoustic conversion** — fauna fade until detection range; call-ring VFX; SM5BAT-class rare event @ 90s.
+- **Meta-progression** — earn survey grants each deployment, spend in Field Lab on permanent rig upgrades.
 
 ## Gameplay
-- **Move:** floating joystick — touch anywhere and drag.
-- **Attack:** automatic. The default Bolt auto-targets the nearest enemy.
-- **Level up:** kills drop green XP gems; collect them to level up and choose 1 of 3 upgrades.
-- **Build variety:**
-  - *Bolt* — Sharper Bolts (+dmg), Rapid Fire (rate), Split Shot (+projectile), Piercing.
-  - *Orbital Blades* — spinning melee that scales with count + damage.
-  - *Shock Nova* — periodic radial pulse; faster + wider.
-  - *Chain Lightning* — arcs between nearby foes; faster + higher voltage.
-  - *Vampiric Leech* — heal on kill; stacks with meta Siphon Core.
-  - *Passives* — Vitality (max HP), Swift Feet (speed), Magnet (pickup range), Regeneration.
-  - *Meta* — Overclock, Hull, Thrusters, Gravity Well, Data Harvest (XP), Siphon Core (leech).
-- **Enemies:** basic chasers, fast skirmishers (28s+), tanks (60s+), ranged shooters (45s+).
-- **Boss:** arrives at **1:30** — high HP, triple-shot barrage, big XP payout.
-- **Escalation:** spawn rate, batch size, enemy HP and damage all ramp with time.
-- **Meta shop:** spend cores on permanent damage, HP, speed, and magnet bonuses.
+- **Move:** floating joystick — deploy quietly through the survey grid.
+- **Listen:** classifiers auto-scan; fauna appear as you enter acoustic detection range.
+- **Identify:** confirmed IDs log species (Passerine, Swift Trill, Resonant Drone, Echo Mimic…).
+- **Rank up:** collect green recording clips → choose 1 of 3 **field kit** modules.
+- **Field kit:**
+  - *Narrow-Beam Mic* — classifier gain, fast sampling, multi-channel array, band-pass filter.
+  - *Perimeter Song Meters* — edge recorders orbiting your rig.
+  - *Harmonic Sweep* — Kaleidoscope-style wideband scan.
+  - *Call Relay Network* — chain IDs across distant callers.
+  - *Passive Monitor* — recover signal clarity on confirm.
+  - *Quiet Approach*, *Clip Magnet*, *Noise Floor Recovery*, *Field Stamina*.
+- **Field Lab (meta):** Amp Gain, Rugged Housing, Quiet Trek, Kaleidoscope Reach, Catalog Accelerator, Passive Monitor.
+- **Rare event @ 1:30:** endangered ultrasonic signature (SM5BAT-class).
 
 ## Run it
 ```bash
-brew install xcodegen          # one-time
-cd ios && xcodegen generate    # writes SWARM.xcodeproj from project.yml
-open SWARM.xcodeproj           # set your signing Team for device, then Run
+brew install xcodegen
+cd ios && xcodegen generate
+open SWARM.xcodeproj
 ```
-Simulator build (no signing):
+
+Simulator build:
 ```bash
-cd ios
-xcodegen generate
+cd ios && xcodegen generate
 xcodebuild -project SWARM.xcodeproj -scheme SWARM -sdk iphonesimulator \
   -destination 'platform=iOS Simulator,name=iPhone 17' \
   -configuration Debug CODE_SIGNING_ALLOWED=NO build
 ```
+
 Unit tests:
 ```bash
-cd ios
-xcodegen generate
-xcodebuild test -project SWARM.xcodeproj -scheme SWARM -sdk iphonesimulator \
+cd ios && xcodebuild test -project SWARM.xcodeproj -scheme SWARM -sdk iphonesimulator \
   -destination 'platform=iOS Simulator,name=iPhone 17' CODE_SIGNING_ALLOWED=NO
 ```
 
-## TestFlight
-Beta tester instructions: **[TESTING.md](TESTING.md)**
-
-### App Store Connect checklist (first upload)
-1. **Developer portal** — Register App ID `ai.swarm.game` with **Game Center** capability enabled.
-2. **App Store Connect** — Create app record (bundle ID `ai.swarm.game`, Games category).
-3. **Leaderboard** — Create `ai.swarm.game.besttime`: integer score, sort **high-to-low** (survival seconds).
-4. **Build number** — Increment `CURRENT_PROJECT_VERSION` in `ios/project.yml` before each upload (ASC rejects duplicate builds).
-5. **Privacy** — App Privacy questionnaire: no tracking; local game progress; Game Center gameplay data for leaderboard.
-6. **Export compliance** — App uses only standard Apple APIs (`ITSAppUsesNonExemptEncryption: false` in Info.plist).
-7. **Beta review** — External TestFlight needs Beta App Review; note that Game Center sign-in is optional (offline play works).
-
-Build an App Store IPA for upload:
-```bash
-chmod +x scripts/build-testflight.sh   # one-time
-DEVELOPMENT_TEAM=YOUR_TEAM_ID ./scripts/build-testflight.sh
-```
-The script writes `build/export/ExportOptions.plist` with your team ID — there is no separate checked-in export plist. Requires Xcode with your Apple ID signed in (Settings → Accounts) and automatic signing. Upload the IPA with **Transporter** (recommended) or `xcrun iTMSTransporter`.
-
 ## Layout
 ```
-swarm/
-└─ ios/
-   ├─ project.yml                  XcodeGen spec (iOS 16+, portrait)
-   └─ SWARM/
-      ├─ App/SwarmApp.swift        App entry; hosts SpriteView + SwiftUI overlays
-      ├─ Game/GameModel.swift      ObservableObject bridge (phase, HUD, upgrade choices)
-      ├─ Game/GameScene.swift      All gameplay (movement, weapons, hordes, XP, juice)
-      ├─ Game/Feedback.swift       Procedural SFX + Core Haptics
-      ├─ Game/MetaStore.swift      Cores + permanent upgrades (UserDefaults)
-      ├─ Game/GameCenterManager.swift  Leaderboard auth + best-time submit
-      ├─ Game/GameSettings.swift   Sound / haptics toggles (UserDefaults)
-      ├─ Views/Overlays.swift      Menu / level-up / game-over / meta / settings UI
-      ├─ Views/ShareCard.swift     Shareable death-summary card renderer
-      └─ Resources/                Assets.xcassets (app icon + accent)
+ios/SWARM/
+  Game/AcousticFieldCatalog.swift   Species + field kit naming
+  Game/GameScene.swift              Survey loop (detection, classifiers, clips)
+  Game/BalanceEngine.swift          Spawn + detection + survey milestones
+  Views/Overlays.swift              Deploy / Field Lab / survey end UI
 ```
 
-## QA / capture hook
-Launching with the `SWARM_AUTOSTART=1` environment variable auto-starts a run and drives a kiting
-auto-pilot (damage-immune) for headless screenshots. Gated entirely by that env var — safe to leave in.
-
-## Next steps (toward a shippable hit)
-- More weapons + enemy archetypes; second boss tier.
-- App Store release after beta feedback.
-- Custom art pass + soundtrack.
+## QA hooks
+- `SWARM_AUTOSTART=1` — auto-deploy, invulnerable (QA screenshots)
+- `SWARM_MORTAL_AUTOSTART=1` — mortal casual stalk for balance batch runs
