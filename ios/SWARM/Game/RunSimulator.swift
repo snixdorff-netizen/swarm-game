@@ -1,5 +1,5 @@
-// Automated multi-run session simulation for balance confidence.
-// Mortal mode models HP, incoming damage, and early death using BalanceEngine combat math.
+// Batch metrics use HeadlessRunDriver (shipped GameScene.update).
+// simulate() below is a legacy fast approx — scalar BalanceEngine only, not used for evidence.
 
 import Foundation
 
@@ -25,6 +25,7 @@ enum SimulationMode: Equatable {
 enum RunSimulator {
     static let defaultMaxSeconds = 120
 
+    /// Legacy fast approx — scalar HP loop; use HeadlessRunDriver for shipped combat evidence.
     static func simulate(
         profile: BuildProfile,
         seed: UInt64,
@@ -151,25 +152,26 @@ enum RunSimulator {
         )
     }
 
-    /// Representative batch for engagement verification: all profiles + meta + boss path.
+    /// Representative batch via HeadlessRunDriver — real GameScene combat loop.
+    @MainActor
     static func representativeBatch() -> [RunMetrics] {
         var runs: [RunMetrics] = []
         for (profileIndex, profile) in BuildProfile.allCases.enumerated() {
             for i in 0..<2 {
                 let seed = UInt64(5000 + i * 31 + profileIndex)
-                runs.append(simulate(profile: profile, seed: seed, mode: .mortal()))
+                runs.append(HeadlessRunDriver.run(profile: profile, seed: seed, maxSeconds: 70, mode: .mortal).asRunMetrics)
             }
         }
-        let suite = "swarm-sim-meta-\(ProcessInfo.processInfo.processIdentifier)"
+        let suite = "swarm-headless-meta-\(ProcessInfo.processInfo.processIdentifier)"
         let ud = UserDefaults(suiteName: suite)!
         ud.removePersistentDomain(forName: suite)
         let meta = MetaStore(defaults: ud)
         meta.awardRun(kills: 600, timeSec: 500)
         for up in MetaCatalog.all where meta.canBuy(up) { _ = meta.buy(up) }
-        runs.append(simulate(profile: .baseline, seed: 8080, meta: meta, mode: .mortal()))
-        runs.append(simulate(profile: .leechTank, seed: 8081, meta: meta, mode: .mortal()))
-        runs.append(simulate(profile: .novaRush, seed: 9090, maxSeconds: 120, mode: .immortalQA))
-        runs.append(simulate(profile: .chainArc, seed: 9091, maxSeconds: 120, mode: .immortalQA))
+        runs.append(HeadlessRunDriver.run(profile: .baseline, seed: 8080, maxSeconds: 70, meta: meta, mode: .mortal).asRunMetrics)
+        runs.append(HeadlessRunDriver.run(profile: .leechTank, seed: 8081, maxSeconds: 70, meta: meta, mode: .mortal).asRunMetrics)
+        runs.append(HeadlessRunDriver.run(profile: .novaRush, seed: 9090, maxSeconds: 120, mode: .immortalQA).asRunMetrics)
+        runs.append(HeadlessRunDriver.run(profile: .chainArc, seed: 9091, maxSeconds: 120, mode: .immortalQA).asRunMetrics)
         return runs
     }
 
@@ -185,8 +187,16 @@ enum RunSimulator {
     }
 
     static func medianSurvival(_ runs: [RunMetrics]) -> Double {
-        guard !runs.isEmpty else { return 0 }
-        let sorted = runs.map { Double($0.survivalSec) }.sorted()
+        median(of: runs.map { Double($0.survivalSec) })
+    }
+
+    static func medianKills(_ runs: [RunMetrics]) -> Double {
+        median(of: runs.map { Double($0.kills) })
+    }
+
+    private static func median(of values: [Double]) -> Double {
+        guard !values.isEmpty else { return 0 }
+        let sorted = values.sorted()
         let mid = sorted.count / 2
         if sorted.count % 2 == 0 {
             return (sorted[mid - 1] + sorted[mid]) / 2
@@ -224,6 +234,7 @@ struct SeededRNG {
 enum SimulationMetricsExporter {
     static let goalScratch = "/var/folders/jc/vlt38jc172b76pd4lmy9ch340000gn/T/grok-goal-a3a70e15315e/implementer"
 
+    @MainActor
     @discardableResult
     static func exportRepresentativeBatch(filename: String = "sim-metrics.json") throws -> URL {
         try export(RunSimulator.representativeBatch(), filename: filename)

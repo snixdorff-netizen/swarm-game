@@ -22,11 +22,12 @@ enum BalanceEngine {
     static let killStreakThresholds: [Int] = [25, 50, 100]
 
     static func spawnInterval(runTime: CGFloat) -> CGFloat {
-        max(0.12, 0.5 - runTime * 0.005)
+        max(0.14, 0.58 - runTime * 0.004)
     }
 
     static func spawnBatchSize(runTime: CGFloat) -> Int {
-        2 + Int(runTime / 18)
+        if runTime < 30 { return 2 }
+        return 2 + Int(runTime / 20)
     }
 
     /// Deterministic enemy kind from run time and roll in 0...1.
@@ -43,7 +44,7 @@ enum BalanceEngine {
 
     static func enemyStats(kind: EnemyKind, runTime: CGFloat) -> EnemyStatBlock {
         let scale = difficultyScale(runTime: runTime)
-        let dmgScale = 1 + runTime * 0.0035
+        let dmgScale = 1 + runTime * 0.003
         switch kind {
         case .basic:
             return EnemyStatBlock(hp: 18 * scale, speed: 52, radius: 12, damage: 8 * dmgScale, xp: 1)
@@ -95,8 +96,8 @@ enum BalanceEngine {
 
     // MARK: - Combat pressure (mirrors GameScene contact + shooter cadence)
 
-    static let contactHurtCooldown: CGFloat = 0.55
-    static let shotHurtCooldown: CGFloat = 0.45
+    static let contactHurtCooldown: CGFloat = 0.62
+    static let shotHurtCooldown: CGFloat = 0.48
     static let playerContactPadding: CGFloat = 13
     /// Autopilot kiter in SWARM_AUTOSTART avoids most hits; mortal sim uses this proc scale.
     static let skilledKiterEfficiency: CGFloat = 0.30
@@ -166,6 +167,6 @@ enum BalanceEngine {
     }
 
     static func leechHealOnKill(leechLevel: Int, metaLeech: CGFloat) -> CGFloat {
-        CGFloat(leechLevel) * 2 + metaLeech
+        CGFloat(leechLevel) * 3 + metaLeech
     }
 }

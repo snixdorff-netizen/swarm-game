@@ -1,8 +1,12 @@
-// Captured outcome from a real GameScene-driven run (testing / evidence).
+// Captured outcome from a real GameScene-driven run (HeadlessRunDriver / evidence).
 
 import Foundation
 
 struct GameSceneRunSummary: Codable, Equatable {
+    let profile: String
+    let seed: UInt64
+    let mode: String
+    let metaLevels: Int
     let survivalSec: Int
     let kills: Int
     let level: Int
@@ -11,7 +15,8 @@ struct GameSceneRunSummary: Codable, Equatable {
     let milestone30: Bool
     let milestone60: Bool
     let finalHp: Int
-    let qaAutopilotImmune: Bool
+    let autopilotMovement: Bool
+    let playerInvulnerable: Bool
 }
 
 enum GameSceneRunEvidenceExporter {

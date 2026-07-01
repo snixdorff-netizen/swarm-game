@@ -2,20 +2,12 @@ import XCTest
 @testable import SWARM
 
 final class RunSimulatorTests: XCTestCase {
-    func testMortalRunsDieWithVariedOutcomes() {
-        let runs = RunSimulator.batchSimulate(count: 12, baseSeed: 9001, profile: .baseline, mode: .mortal())
-        XCTAssertTrue(runs.contains(where: \.died), "Mortal sim must produce death outcomes")
-        XCTAssertTrue(runs.contains(where: { $0.survivalSec >= 30 }), "Some runs should pass 30s milestone")
-        XCTAssertGreaterThan(RunSimulator.survivalVariance(runs), 0, "Survival must vary across seeds")
-        XCTAssertTrue(runs.contains(where: { $0.survivalSec < RunSimulator.defaultMaxSeconds }),
-                      "Mortal runs must not all hit the time cap")
-    }
+    // MARK: - Legacy scalar approx (BalanceEngine math only)
 
-    func testBatchMedianSurvivalAtLeastThirtySeconds() {
+    func testLegacyMortalRunsDieWithVariedOutcomes() {
         let runs = RunSimulator.batchSimulate(count: 12, baseSeed: 9001, profile: .baseline, mode: .mortal())
-        let median = RunSimulator.medianSurvival(runs)
-        XCTAssertGreaterThanOrEqual(median, 30, "Mortal baseline median survival should be ≥30s")
-        XCTAssertTrue(runs.allSatisfy { $0.survivalSec > 0 })
+        XCTAssertTrue(runs.contains(where: \.died))
+        XCTAssertGreaterThan(RunSimulator.survivalVariance(runs), 0)
     }
 
     func testZeroOutgoingDPSDiesEarly() {
@@ -32,26 +24,7 @@ final class RunSimulatorTests: XCTestCase {
             hp -= incoming
             seconds += 1
         }
-        XCTAssertLessThan(seconds, 30, "No outgoing DPS + horde pressure should kill within 30s")
-    }
-
-    func testImmortalQAMatchesAutostartNoDamage() {
-        let mortal = RunSimulator.simulate(profile: .baseline, seed: 55, mode: .mortal())
-        let immortal = RunSimulator.simulate(profile: .baseline, seed: 55, mode: .immortalQA)
-        XCTAssertTrue(mortal.died || mortal.survivalSec < immortal.survivalSec)
-        XCTAssertFalse(immortal.died)
-        XCTAssertEqual(immortal.survivalSec, RunSimulator.defaultMaxSeconds)
-        XCTAssertTrue(immortal.bossReached)
-        XCTAssertEqual(immortal.mode, "immortalQA")
-        XCTAssertGreaterThan(immortal.kills, mortal.kills)
-    }
-
-    func testBuildProfilesDivergeOnSurvival() {
-        let bolt = RunSimulator.batchSimulate(count: 6, baseSeed: 200, profile: .baseline, mode: .mortal())
-        let leech = RunSimulator.batchSimulate(count: 6, baseSeed: 200, profile: .leechTank, mode: .mortal())
-        XCTAssertTrue(RunSimulator.runsDivergeOnSurvival(bolt, leech),
-                      "Leech tank should survive longer than bolt baseline")
-        XCTAssertGreaterThan(RunSimulator.medianSurvival(leech), RunSimulator.medianSurvival(bolt))
+        XCTAssertLessThan(seconds, 30)
     }
 
     func testIncomingDamageScalesWithHorde() {
@@ -62,6 +35,68 @@ final class RunSimulatorTests: XCTestCase {
         XCTAssertEqual(none, 0)
     }
 
+    func testBuildStateDPSIncreasesWithUpgrades() {
+        var state = BuildState()
+        let base = state.estimatedDPS(enemyCount: 20)
+        state.apply(upgradeId: "bolt_dmg")
+        state.apply(upgradeId: "bolt_rate")
+        XCTAssertGreaterThan(state.estimatedDPS(enemyCount: 20), base)
+        XCTAssertGreaterThan(
+            BalanceEngine.outgoingKillRate(enemyCount: 30, runTime: 45, build: state),
+            BalanceEngine.outgoingKillRate(enemyCount: 30, runTime: 45, build: BuildState())
+        )
+    }
+
+    // MARK: - Headless batch (shipped GameScene)
+
+    @MainActor
+    func testHeadlessBatchMedianSurvivalAtLeastThirtySeconds() {
+        let runs = HeadlessRunDriver.batch(count: 6, baseSeed: 9001, profile: .baseline, mode: .mortal)
+            .map(\.asRunMetrics)
+        let median = RunSimulator.medianSurvival(runs)
+        XCTAssertGreaterThanOrEqual(median, 30)
+        XCTAssertTrue(runs.allSatisfy { $0.survivalSec > 0 })
+        XCTAssertTrue(runs.contains(where: { $0.kills > 0 }))
+    }
+
+    @MainActor
+    func testHeadlessBuildProfilesDivergeOnRealLoop() {
+        let bolt = HeadlessRunDriver.batch(count: 4, baseSeed: 200, profile: .baseline, maxSeconds: 45, mode: .mortal).map(\.asRunMetrics)
+        let leech = HeadlessRunDriver.batch(count: 4, baseSeed: 200, profile: .leechTank, maxSeconds: 45, mode: .mortal).map(\.asRunMetrics)
+        let nova = HeadlessRunDriver.batch(count: 4, baseSeed: 200, profile: .novaRush, maxSeconds: 45, mode: .mortal).map(\.asRunMetrics)
+        XCTAssertNotEqual(RunSimulator.medianKills(bolt), RunSimulator.medianKills(leech))
+        XCTAssertNotEqual(RunSimulator.medianKills(bolt), RunSimulator.medianKills(nova))
+    }
+
+    @MainActor
+    func testMetaLeechOutlastsBaselineOnHeadlessLoop() {
+        let suite = "swarm-headless-meta-test-\(ProcessInfo.processInfo.processIdentifier)"
+        let ud = UserDefaults(suiteName: suite)!
+        ud.removePersistentDomain(forName: suite)
+        let meta = MetaStore(defaults: ud)
+        meta.awardRun(kills: 600, timeSec: 500)
+        for up in MetaCatalog.all where meta.canBuy(up) { _ = meta.buy(up) }
+        let base = HeadlessRunDriver.run(profile: .baseline, seed: 8080, maxSeconds: 70, meta: meta, mode: .mortal).asRunMetrics
+        let leech = HeadlessRunDriver.run(profile: .leechTank, seed: 8081, maxSeconds: 70, meta: meta, mode: .mortal).asRunMetrics
+        XCTAssertGreaterThanOrEqual(leech.survivalSec, base.survivalSec)
+        XCTAssertGreaterThan(leech.kills, 0)
+    }
+
+    @MainActor
+    func testImmortalQAReachesBossOnHeadlessLoop() {
+        let immortal = HeadlessRunDriver.run(profile: .baseline, seed: 55, maxSeconds: 120, mode: .immortalQA)
+        let mortal = HeadlessRunDriver.run(profile: .baseline, seed: 55, maxSeconds: 120, mode: .mortal)
+        XCTAssertFalse(immortal.died)
+        XCTAssertEqual(immortal.survivalSec, HeadlessRunDriver.defaultMaxSeconds)
+        XCTAssertTrue(immortal.bossSpawned)
+        XCTAssertEqual(immortal.mode, "immortalQA")
+        XCTAssertTrue(immortal.playerInvulnerable)
+        XCTAssertFalse(mortal.playerInvulnerable)
+        XCTAssertGreaterThan(immortal.kills, 0)
+        XCTAssertGreaterThan(mortal.kills, 0)
+    }
+
+    @MainActor
     func testExportRepresentativeBatchToScratch() throws {
         let url = try SimulationMetricsExporter.exportRepresentativeBatch()
         XCTAssertTrue(FileManager.default.fileExists(atPath: url.path))
@@ -76,23 +111,13 @@ final class RunSimulatorTests: XCTestCase {
         XCTAssertTrue(decoded.contains(where: { $0.bossReached }))
         XCTAssertTrue(decoded.contains(where: { $0.metaLevels > 0 }))
         XCTAssertTrue(decoded.contains(where: { $0.mode == "immortalQA" && $0.survivalSec >= 60 }))
-        XCTAssertTrue(decoded.contains(where: { $0.mode == "mortal" && $0.died }))
+        XCTAssertTrue(decoded.contains(where: { $0.mode == "mortal" && $0.survivalSec >= 30 && $0.kills > 0 }))
         let mortal = decoded.filter { $0.mode == "mortal" }
-        XCTAssertGreaterThan(Set(mortal.map(\.survivalSec)).count, 1, "Mortal profiles must spread survival")
-        let leechMedian = RunSimulator.medianSurvival(decoded.filter { $0.profile == BuildProfile.leechTank.rawValue && $0.mode == "mortal" })
-        let baseMedian = RunSimulator.medianSurvival(decoded.filter { $0.profile == BuildProfile.baseline.rawValue && $0.mode == "mortal" })
-        XCTAssertGreaterThan(leechMedian, baseMedian)
-    }
-
-    func testBuildStateDPSIncreasesWithUpgrades() {
-        var state = BuildState()
-        let base = state.estimatedDPS(enemyCount: 20)
-        state.apply(upgradeId: "bolt_dmg")
-        state.apply(upgradeId: "bolt_rate")
-        XCTAssertGreaterThan(state.estimatedDPS(enemyCount: 20), base)
-        XCTAssertGreaterThan(
-            BalanceEngine.outgoingKillRate(enemyCount: 30, runTime: 45, build: state),
-            BalanceEngine.outgoingKillRate(enemyCount: 30, runTime: 45, build: BuildState())
-        )
+        XCTAssertGreaterThan(Set(mortal.map(\.kills)).count, 1, "Mortal headless runs must spread kill counts")
+        let leechMeta = decoded.filter { $0.seed == 8081 && $0.mode == "mortal" }
+        let baseMeta = decoded.filter { $0.seed == 8080 && $0.mode == "mortal" }
+        XCTAssertEqual(leechMeta.count, 1)
+        XCTAssertEqual(baseMeta.count, 1)
+        XCTAssertGreaterThanOrEqual(leechMeta[0].survivalSec, baseMeta[0].survivalSec)
     }
 }

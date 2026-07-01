@@ -145,7 +145,9 @@ final class GameScene: SKScene {
 
     private var lastTime: TimeInterval = 0
     private let maxEnemies = 130
-    private var autoDrive = false   // env-gated: drives movement for headless gameplay capture
+    private var autopilotMovement = false   // kiting movement (SWARM_AUTOSTART / headless batch)
+    private var playerInvulnerable = false // skips hp-= (SWARM_AUTOSTART only; mortal batch uses false)
+    var testingRunProfile: BuildProfile?
 
     // MARK: - Setup
 
@@ -162,7 +164,9 @@ final class GameScene: SKScene {
         setChrome(false)
         if ProcessInfo.processInfo.environment["SWARM_AUTOSTART"] != nil {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
-                self?.startRun(); self?.autoDrive = true
+                self?.startRun()
+                self?.autopilotMovement = true
+                self?.playerInvulnerable = true
             }
         }
     }
@@ -269,7 +273,7 @@ final class GameScene: SKScene {
         bossSpawned = false; bossWarnLabel.isHidden = true
         let meta = model?.meta
         dmgMult = meta?.damageMult ?? 1
-        hp = 100 + (meta?.bonusHp ?? 0); maxHp = hp
+        hp = 96 + (meta?.bonusHp ?? 0); maxHp = hp
         moveSpeed = 178 * (meta?.speedMult ?? 1)
         pickupRadius = 78 + (meta?.bonusMagnet ?? 0); regen = 0
         boltDmg = 12; boltInterval = 0.72; boltTimer = 0; boltCount = 1; boltPierce = 0
@@ -286,7 +290,7 @@ final class GameScene: SKScene {
         cam.position = .zero
         publishHUD(); layoutHUD()
         setChrome(true)
-        for _ in 0..<6 { spawnOne() }
+        for _ in 0..<4 { spawnOne() }
         model?.phase = .playing
     }
 
@@ -337,12 +341,28 @@ final class GameScene: SKScene {
         guard model?.phase == .playing, dt > 0 else { return }
 
         runTime += dt
-        if autoDrive {
-            if let e = nearestEnemy() {
+        if autopilotMovement {
+            var fleeX: CGFloat = 0, fleeY: CGFloat = 0, nearby = 0
+            for e in enemies {
+                let dx = pPos.x - e.node.position.x, dy = pPos.y - e.node.position.y
+                let d2 = dx*dx + dy*dy
+                if d2 < 220 * 220 {
+                    let d = max(1, d2.squareRoot())
+                    fleeX += dx / d
+                    fleeY += dy / d
+                    nearby += 1
+                }
+            }
+            if nearby > 0 {
+                let d = max(1, (fleeX*fleeX + fleeY*fleeY).squareRoot())
+                moveDir = CGVector(dx: fleeX/d * 0.88 + (-fleeY/d) * 0.28, dy: fleeY/d * 0.88 + (fleeX/d) * 0.28)
+            } else if let e = nearestEnemy() {
                 let dx = pPos.x - e.node.position.x, dy = pPos.y - e.node.position.y
                 let d = max(1, (dx*dx + dy*dy).squareRoot())
-                moveDir = CGVector(dx: dx/d * 0.85 - dy/d * 0.5, dy: dy/d * 0.85 + dx/d * 0.5)
-            } else { moveDir = CGVector(dx: cos(runTime), dy: sin(runTime)) }
+                moveDir = CGVector(dx: dx/d, dy: dy/d)
+            } else {
+                moveDir = CGVector(dx: cos(runTime * 1.1), dy: sin(runTime * 1.1))
+            }
         }
         if regen > 0 && hp < maxHp { hp = min(maxHp, hp + regen * dt) }
         if hurtCooldown > 0 { hurtCooldown -= dt }
@@ -494,6 +514,7 @@ final class GameScene: SKScene {
     }
 
     private func updateEnemies(_ dt: CGFloat) {
+        let chaseMult = 1 + min(0.85, runTime * 0.01)
         for e in enemies {
             let dx = pPos.x - e.node.position.x, dy = pPos.y - e.node.position.y
             let d = max(1, (dx*dx + dy*dy).squareRoot())
@@ -515,13 +536,22 @@ final class GameScene: SKScene {
                     for i in -1...1 { fireEnemyShot(from: e.node.position, dmg: e.dmg * 0.35, spread: CGFloat(i) * 0.22) }
                 }
             } else {
-                e.node.position.x += dx/d * e.speed * dt
-                e.node.position.y += dy/d * e.speed * dt
+                e.node.position.x += dx/d * e.speed * chaseMult * dt
+                e.node.position.y += dy/d * e.speed * chaseMult * dt
             }
             if e.flash > 0 { e.flash -= dt; if e.flash <= 0 { e.node.colorBlendFactor = 0 } }
             if d < e.radius + 13 && hurtCooldown <= 0 {
-                if !autoDrive { hp -= e.dmg; flashHurt() }
-                hurtCooldown = 0.55
+                if !playerInvulnerable {
+                    var pack = 0
+                    for other in enemies {
+                        let odx = pPos.x - other.node.position.x, ody = pPos.y - other.node.position.y
+                        if odx*odx + ody*ody < 52 * 52 { pack += 1 }
+                    }
+                    let packMult = 1 + CGFloat(min(pack, 8)) * 0.05
+                    hp -= e.dmg * BalanceEngine.difficultyScale(runTime: runTime) * packMult
+                    flashHurt()
+                }
+                hurtCooldown = BalanceEngine.contactHurtCooldown
             }
         }
     }
@@ -543,8 +573,8 @@ final class GameScene: SKScene {
             s.life -= dt
             let dx = pPos.x - s.node.position.x, dy = pPos.y - s.node.position.y
             if dx*dx + dy*dy < 18*18 && hurtCooldown <= 0 {
-                if !autoDrive { hp -= s.dmg; flashHurt() }
-                hurtCooldown = 0.45
+                if !playerInvulnerable { hp -= s.dmg; flashHurt() }
+                hurtCooldown = BalanceEngine.shotHurtCooldown
                 s.life = 0
             }
         }
@@ -705,7 +735,7 @@ final class GameScene: SKScene {
         if let idx = enemies.firstIndex(where: { $0 === e }) { enemies.remove(at: idx) }
         kills += 1; model?.kills = kills
         checkKillStreak(kills)
-        let leech = CGFloat(leechLevel) * 2 + leechPerKill
+        let leech = CGFloat(leechLevel) * 3 + leechPerKill
         if leech > 0 { hp = min(maxHp, hp + leech) }
         SfxPlayer.shared.kill(); Haptics.shared.kill()
         burst(at: e.node.position, color: e.node.color)
@@ -787,7 +817,7 @@ final class GameScene: SKScene {
         sticking = false; moveDir = .zero; stickBase.isHidden = true; stickKnob.isHidden = true
         SfxPlayer.shared.levelUp(); Haptics.shared.levelUp()
         model?.phase = .levelUp
-        if autoDrive, let first = choices.first {
+        if autopilotMovement, let first = choices.first {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in self?.applyUpgrade(first.id) }
         }
     }
@@ -857,9 +887,14 @@ final class GameScene: SKScene {
 // MARK: - Testing harness (drives shipped update/combat/die path in unit tests)
 
 extension GameScene {
-    var qaAutopilotImmune: Bool {
-        get { autoDrive }
-        set { autoDrive = newValue }
+    var testingAutopilotMovement: Bool {
+        get { autopilotMovement }
+        set { autopilotMovement = newValue }
+    }
+
+    var testingPlayerInvulnerable: Bool {
+        get { playerInvulnerable }
+        set { playerInvulnerable = newValue }
     }
 
     var testingHp: CGFloat { hp }
@@ -874,18 +909,37 @@ extension GameScene {
         if view.scene !== self { view.presentScene(self) }
     }
 
-    func testing_resolveLevelUpIfNeeded() {
+    func testing_applyRunProfile(_ profile: BuildProfile) {
+        guard profile == .metaBoosted else { return }
+        dmgMult = max(dmgMult, 1.15)
+        xpMult = max(xpMult, 1.08)
+        maxHp += 16
+        hp += 16
+    }
+
+    func testing_resolveLevelUpIfNeeded(preferring profile: BuildProfile? = nil) {
         guard model?.phase == .levelUp else { return }
-        if let id = model?.choices.first?.id {
+        let pick: String?
+        if let profile {
+            let preferred = BuildState.preferredUpgrade(for: profile)
+            if model?.choices.contains(where: { $0.id == preferred }) == true {
+                pick = preferred
+            } else {
+                pick = model?.choices.first?.id
+            }
+        } else {
+            pick = model?.choices.first?.id
+        }
+        if let id = pick {
             applyUpgrade(id)
         } else {
             model?.phase = .playing
         }
     }
 
-    func testing_step(at time: TimeInterval) {
+    func testing_step(at time: TimeInterval, profile: BuildProfile? = nil) {
         update(time)
-        testing_resolveLevelUpIfNeeded()
+        testing_resolveLevelUpIfNeeded(preferring: profile ?? testingRunProfile)
     }
 
     func testing_suppressOffense() {
@@ -924,19 +978,40 @@ extension GameScene {
         enemyShots.append(EnemyShot(node: node, vel: .zero, dmg: damage, life: 2))
     }
 
-    func testing_fastForward(seconds: CGFloat, step: TimeInterval = 1.0 / 60.0, maxSteps: Int = 12_000) {
+    func testing_fastForward(
+        seconds: CGFloat,
+        step: TimeInterval = 1.0 / 60.0,
+        maxSteps: Int = 12_000,
+        profile: BuildProfile? = nil
+    ) {
+        let build = profile ?? testingRunProfile
         var t = lastTime == 0 ? 0 : lastTime
         var steps = 0
-        while runTime < seconds, model?.phase == .playing, steps < maxSteps {
-            t += step
-            update(t)
-            testing_resolveLevelUpIfNeeded()
+        while runTime < seconds, model?.phase != .dead, steps < maxSteps {
+            if model?.phase == .levelUp {
+                testing_resolveLevelUpIfNeeded(preferring: build)
+            } else {
+                t += step
+                update(t)
+                testing_resolveLevelUpIfNeeded(preferring: build)
+            }
             steps += 1
         }
     }
 
-    func testing_captureSummary() -> GameSceneRunSummary {
-        GameSceneRunSummary(
+    func testing_captureSummary(
+        profile: BuildProfile = .baseline,
+        seed: UInt64 = 0,
+        mode: HeadlessRunMode = .mortal
+    ) -> GameSceneRunSummary {
+        let metaLevels = model.map { store in
+            MetaCatalog.all.reduce(0) { $0 + store.meta.level(for: $1.id) }
+        } ?? 0
+        return GameSceneRunSummary(
+            profile: profile.rawValue,
+            seed: seed,
+            mode: mode.rawValue,
+            metaLevels: metaLevels,
             survivalSec: Int(runTime.rounded(.down)),
             kills: kills,
             level: level,
@@ -945,7 +1020,8 @@ extension GameScene {
             milestone30: hitMilestones.contains(30),
             milestone60: hitMilestones.contains(60),
             finalHp: max(0, Int(hp)),
-            qaAutopilotImmune: autoDrive
+            autopilotMovement: autopilotMovement,
+            playerInvulnerable: playerInvulnerable
         )
     }
 }

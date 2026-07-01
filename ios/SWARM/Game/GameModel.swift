@@ -36,13 +36,14 @@ final class GameModel: ObservableObject {
     @Published var deathSubline: String = ""
     @Published var runWasNewBest: Bool = false
 
-    let meta = MetaStore()
+    let meta: MetaStore
     private var cancellables = Set<AnyCancellable>()
 
     var bestTime: Int { meta.bestTime }
     var cores: Int { meta.cores }
 
-    init() {
+    init(meta: MetaStore = MetaStore()) {
+        self.meta = meta
         meta.objectWillChange
             .sink { [weak self] _ in self?.objectWillChange.send() }
             .store(in: &cancellables)

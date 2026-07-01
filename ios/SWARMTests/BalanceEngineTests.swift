@@ -11,6 +11,7 @@ final class BalanceEngineTests: XCTestCase {
 
     func testSpawnBatchGrowsWithTime() {
         XCTAssertEqual(BalanceEngine.spawnBatchSize(runTime: 0), 2)
+        XCTAssertEqual(BalanceEngine.spawnBatchSize(runTime: 20), 2)
         XCTAssertGreaterThan(BalanceEngine.spawnBatchSize(runTime: 54), 2)
     }
 
@@ -66,6 +67,6 @@ final class BalanceEngineTests: XCTestCase {
     }
 
     func testLeechHealMatchesGameSceneFormula() {
-        XCTAssertEqual(BalanceEngine.leechHealOnKill(leechLevel: 2, metaLeech: 1), 5)
+        XCTAssertEqual(BalanceEngine.leechHealOnKill(leechLevel: 2, metaLeech: 1), 7)
     }
 }
