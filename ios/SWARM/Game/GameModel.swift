@@ -49,6 +49,7 @@ final class GameModel: ObservableObject {
     @Published var speciesRichness: Int = 0
     @Published var surveyScoreBest: Bool = false
     @Published var recentVouchers: [DetectionVoucher] = []
+    @Published var vetSession: VetSession?
 
     let meta: MetaStore
     let catalog: SpeciesCatalogStore
@@ -107,6 +108,7 @@ final class GameModel: ObservableObject {
     var onChoose: (String) -> Void = { _ in }
     var onRestart: () -> Void = {}
     var onListenBurst: () -> Void = {}
+    var onVetDecision: (String, VetStatus) -> Void = { _, _ in }
 
     func start() {
         if !GameSettings.mentorshipCompleted {
@@ -129,6 +131,7 @@ final class GameModel: ObservableObject {
         speciesRichness = 0
         noiseBudgetPct = 100
         recentVouchers = []
+        vetSession = nil
         deploymentId = nil
         passiveBatMode = false
         fieldOverlayHint = nil
@@ -141,6 +144,11 @@ final class GameModel: ObservableObject {
     }
 
     func listenBurst() { onListenBurst() }
+
+    func submitVet(_ decision: VetStatus) {
+        guard let session = vetSession else { return }
+        onVetDecision(session.voucherId, decision)
+    }
     func openCatalog() { phase = .catalog }
     func closeCatalog() { phase = .menu }
     func openLabBoard() { phase = .labBoard }

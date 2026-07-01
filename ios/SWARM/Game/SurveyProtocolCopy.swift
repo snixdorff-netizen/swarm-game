@@ -12,4 +12,13 @@ enum SurveyProtocolCopy {
     static let missionIncomplete = "MISSION INCOMPLETE"
     static let validated = "Validated"
     static let tentative = "Tentative ID"
+    static let autoIdAccepted = "Auto-ID accepted"
+    static let manualIdConfirmed = "Manual ID confirmed"
+    static let manualIdRejected = "Rejected (noise)"
+    static let needsReview = "Needs review"
+    static let presencePresent = "Present"
+    static let presenceTentative = "Tentative"
+    static let presenceInsufficient = "Insufficient evidence"
+    static let conservativeClassifier = "+1 Conservative classifier"
+    static let presenceAbsenceHeader = "Presence / absence"
 }

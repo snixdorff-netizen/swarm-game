@@ -4,11 +4,11 @@ import XCTest
 final class SurveyMissionTests: XCTestCase {
     private func voucher(
         id: String, speciesId: String, commonName: String, scientificName: String,
-        confidence: CGFloat, timeSec: Int, validated: Bool
+        confidence: CGFloat, timeSec: Int, vetStatus: VetStatus = .autoAccepted
     ) -> DetectionVoucher {
         DetectionVoucher(
             id: id, speciesId: speciesId, commonName: commonName, scientificName: scientificName,
-            confidence: confidence, timeSec: timeSec, validated: validated,
+            confidence: confidence, timeSec: timeSec, vetStatus: vetStatus,
             deploymentId: "DEP-TEST", siteLabel: "Canopy Transect",
             recorderProfile: "Song Meter SM5",
             clipFilename: VoucherClipNaming.filename(speciesId: speciesId, sequence: 1, deploymentId: "DEP-TEST")
@@ -33,15 +33,15 @@ final class SurveyMissionTests: XCTestCase {
         )
         let vouchers = [
             voucher(id: "v1", speciesId: "wood_thrush", commonName: "Wood Thrush",
-                    scientificName: "Hylocichla mustelina", confidence: 0.72, timeSec: 60, validated: true),
+                    scientificName: "Hylocichla mustelina", confidence: 0.72, timeSec: 60),
             voucher(id: "v2", speciesId: "ovenbird", commonName: "Ovenbird",
-                    scientificName: "Seiurus aurocapilla", confidence: 0.68, timeSec: 90, validated: true),
+                    scientificName: "Seiurus aurocapilla", confidence: 0.68, timeSec: 90),
             voucher(id: "v3", speciesId: "wood_thrush", commonName: "Wood Thrush",
-                    scientificName: "Hylocichla mustelina", confidence: 0.70, timeSec: 120, validated: true),
+                    scientificName: "Hylocichla mustelina", confidence: 0.70, timeSec: 120),
             voucher(id: "v4", speciesId: "bullfrog", commonName: "American Bullfrog",
-                    scientificName: "Lithobates catesbeianus", confidence: 0.75, timeSec: 150, validated: true),
+                    scientificName: "Lithobates catesbeianus", confidence: 0.75, timeSec: 150),
             voucher(id: "v5", speciesId: "barred_owl", commonName: "Barred Owl",
-                    scientificName: "Strix varia", confidence: 0.71, timeSec: 180, validated: true),
+                    scientificName: "Strix varia", confidence: 0.71, timeSec: 180),
         ]
         let report = SurveyScoreEngine.compute(mission: mission, timeSec: 200, vouchers: vouchers, aborted: false)
         XCTAssertTrue(report.missionPassed)
@@ -54,7 +54,7 @@ final class SurveyMissionTests: XCTestCase {
         let mission = SurveyMission.random(deployMode: .sm5, seed: 1)
         let vouchers = [
             voucher(id: "v1", speciesId: "wood_thrush", commonName: "Wood Thrush",
-                    scientificName: "Hylocichla mustelina", confidence: 0.8, timeSec: 10, validated: true),
+                    scientificName: "Hylocichla mustelina", confidence: 0.8, timeSec: 10),
         ]
         let ok = SurveyScoreEngine.compute(mission: mission, timeSec: 60, vouchers: vouchers, aborted: false)
         let aborted = SurveyScoreEngine.compute(mission: mission, timeSec: 60, vouchers: vouchers, aborted: true)
@@ -76,7 +76,7 @@ final class SurveyMissionTests: XCTestCase {
         let vouchers = (0..<7).map { i in
             voucher(
                 id: "v\(i)", speciesId: "sp\(i % 3)", commonName: "Sp \(i)", scientificName: "S. \(i)",
-                confidence: 0.63, timeSec: 30 + i * 10, validated: true
+                confidence: 0.63, timeSec: 30 + i * 10
             )
         }
         let strict = SurveyScoreEngine.compute(mission: mission, timeSec: 200, vouchers: vouchers, aborted: false, traineeMode: false)

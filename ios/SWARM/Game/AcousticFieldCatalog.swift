@@ -47,8 +47,8 @@ enum AcousticFieldCopy {
     static let firstRunSteps: [String] = [
         "Drag to reposition your Song Meter rig (SM5BAT = passive monitor)",
         "Listen for band-specific calls — tap Listen for spectrogram burst",
+        "Vet tentative IDs — Confirm / Reject / Needs review after Listen",
         "Confirmed IDs archive automatically — rank up your survey rig",
-        "Choose field kit modules each rank",
         "Earn survey grants → Field Lab between deployments",
     ]
 }

@@ -10,7 +10,7 @@ final class VoucherMetadataTests: XCTestCase {
             scientificName: "Hylocichla mustelina",
             confidence: 0.82,
             timeSec: 120,
-            validated: true,
+            vetStatus: .autoAccepted,
             deploymentId: "DEP-00001039",
             siteLabel: "Canopy Transect",
             recorderProfile: "Song Meter SM5",
@@ -43,7 +43,8 @@ final class VoucherMetadataTests: XCTestCase {
             surveyScore: 500,
             missionPassed: true,
             abortReason: nil,
-            vouchers: [sampleVoucher()]
+            vouchers: [sampleVoucher()],
+            presenceRecords: []
         )
         let text = SurveyReportExporter.textReport(report, deployMode: .sm5)
         XCTAssertTrue(text.contains("DEP-00001039"))
@@ -68,9 +69,11 @@ final class VoucherMetadataTests: XCTestCase {
             surveyScore: 400,
             missionPassed: false,
             abortReason: nil,
-            vouchers: [sampleVoucher()]
+            vouchers: [sampleVoucher()],
+            presenceRecords: []
         )
         let csv = SurveyReportExporter.csvRows(report, deployMode: .sm5bat)
+        XCTAssertTrue(csv.contains("auto_id,manual_id,vet_status"))
         XCTAssertTrue(csv.contains("deployment_id,site_label,recorder_profile,clip_filename"))
         XCTAssertTrue(csv.contains("Wetland Edge"))
         XCTAssertTrue(csv.contains("SWARM_wood_thrush"))

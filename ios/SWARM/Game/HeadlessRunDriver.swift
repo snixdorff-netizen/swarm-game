@@ -24,6 +24,7 @@ enum HeadlessRunDriver {
         let store = meta ?? MetaStore(defaults: isolatedDefaults(seed: seed))
         GameSettings.mentorshipCompleted = true
         GameSettings.traineeMode = false
+        GameSettings.conservativeClassifier = false
         GameSettings.habitatSite = .canopy
         GameSettings.transectMode = .fieldDay
         let model = GameModel(meta: store)

@@ -11,7 +11,7 @@ enum MentorshipCopy {
         "Set habitat site and mission hypothesis on the brief card",
         "Walk transect quietly — noise budget is your clarity meter",
         "Tap Listen before logging mimic species (false positives cost budget)",
-        "Collect recording clips to rank up field kit modules",
+        "Vet tentative IDs — Confirm, Reject, or leave for review (Kaleidoscope-style)",
         "Complete transect or abort — export survey report for the lab",
     ]
 

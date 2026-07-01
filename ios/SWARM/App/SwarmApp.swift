@@ -29,6 +29,7 @@ final class GameHost: ObservableObject {
         model.onChoose = { id in s.applyUpgrade(id) }
         model.onRestart = { s.restartToMenu() }
         model.onListenBurst = { s.triggerListenBurst() }
+        model.onVetDecision = { voucherId, decision in s.applyVetDecision(voucherId: voucherId, decision: decision) }
     }
 }
 

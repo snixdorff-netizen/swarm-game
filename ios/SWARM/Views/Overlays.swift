@@ -101,7 +101,7 @@ struct MenuOverlay: View {
                     Button("Species Catalog") { model.openCatalog() }.buttonStyle(NeonButton(tint: SwarmTheme.panelMuted))
                     Button(AcousticFieldCopy.fieldLabButton) { model.openMeta() }.buttonStyle(NeonButton(tint: WildlifeAcousticsPalette.swiftUI(WildlifeAcousticsPalette.brown)))
                     if seenHint {
-                        Text("Drag to move · classifiers scan automatically · IDs archive on confirm")
+                        Text("Drag to move · classifiers scan · vet tentative IDs after Listen")
                             .font(SwarmTheme.ui(12)).foregroundColor(SwarmTheme.foam.opacity(0.5))
                             .multilineTextAlignment(.center)
                     }
@@ -251,6 +251,12 @@ struct GameOverOverlay: View {
                         stat("\(report?.richness ?? model.speciesRichness)", "species")
                     }.padding(.top, 12)
 
+                    if let report, !report.presenceRecords.isEmpty {
+                        presenceList(report.presenceRecords)
+                            .padding(.horizontal, 28)
+                            .padding(.top, 8)
+                    }
+
                     if let report, !report.vouchers.isEmpty {
                         voucherList(report.vouchers)
                             .padding(.horizontal, 28)
@@ -311,6 +317,44 @@ struct GameOverOverlay: View {
             .padding(.top, 6)
     }
 
+    private func presenceList(_ records: [SpeciesPresenceRecord]) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(SurveyProtocolCopy.presenceAbsenceHeader)
+                .font(SwarmTheme.ui(11, .bold))
+                .foregroundColor(SwarmTheme.foam.opacity(0.55))
+            ForEach(records.prefix(8)) { record in
+                HStack(spacing: 8) {
+                    Image(systemName: presenceIcon(record.status))
+                        .font(.system(size: 12))
+                        .foregroundColor(presenceColor(record.status))
+                    Text(record.summaryLine)
+                        .font(SwarmTheme.ui(11, .semibold))
+                        .foregroundColor(SwarmTheme.foam.opacity(0.85))
+                    Spacer()
+                }
+            }
+        }
+        .padding(12)
+        .background(RoundedRectangle(cornerRadius: 12).fill(SwarmTheme.panel))
+        .overlay(RoundedRectangle(cornerRadius: 12).stroke(SwarmTheme.olive.opacity(0.35), lineWidth: 1))
+    }
+
+    private func presenceIcon(_ status: PresenceStatus) -> String {
+        switch status {
+        case .present: return "checkmark.circle.fill"
+        case .tentative: return "questionmark.circle"
+        case .insufficientEvidence: return "minus.circle"
+        }
+    }
+
+    private func presenceColor(_ status: PresenceStatus) -> Color {
+        switch status {
+        case .present: return SwarmTheme.olive
+        case .tentative: return SwarmTheme.cyan.opacity(0.75)
+        case .insufficientEvidence: return SwarmTheme.foam.opacity(0.35)
+        }
+    }
+
     private func voucherList(_ vouchers: [DetectionVoucher]) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             Text("Detection vouchers")
@@ -318,9 +362,9 @@ struct GameOverOverlay: View {
                 .foregroundColor(SwarmTheme.foam.opacity(0.55))
             ForEach(vouchers.suffix(6)) { v in
                 HStack(spacing: 8) {
-                    Image(systemName: v.validated ? "checkmark.seal.fill" : "questionmark.circle")
+                    Image(systemName: vetIcon(v.vetStatus))
                         .font(.system(size: 12))
-                        .foregroundColor(v.validated ? SwarmTheme.olive : SwarmTheme.foam.opacity(0.4))
+                        .foregroundColor(vetColor(v.vetStatus))
                     VStack(alignment: .leading, spacing: 1) {
                         Text(v.commonName)
                             .font(SwarmTheme.ui(12, .semibold))
@@ -334,14 +378,35 @@ struct GameOverOverlay: View {
                             .foregroundColor(SwarmTheme.cyan.opacity(0.55))
                     }
                     Spacer()
-                    Text("\(Int(v.confidence * 100))%")
-                        .font(SwarmTheme.ui(11, .bold))
-                        .foregroundColor(SwarmTheme.cyan.opacity(0.8))
+                    VStack(alignment: .trailing, spacing: 2) {
+                        Text("\(Int(v.confidence * 100))%")
+                            .font(SwarmTheme.ui(11, .bold))
+                            .foregroundColor(SwarmTheme.cyan.opacity(0.8))
+                        Text(v.vetStatus.label)
+                            .font(SwarmTheme.ui(8, .medium))
+                            .foregroundColor(SwarmTheme.foam.opacity(0.45))
+                    }
                 }
             }
         }
         .padding(12)
         .background(RoundedRectangle(cornerRadius: 12).fill(SwarmTheme.panelMuted))
+    }
+
+    private func vetIcon(_ status: VetStatus) -> String {
+        switch status {
+        case .autoAccepted, .confirmed: return "checkmark.seal.fill"
+        case .needsReview: return "questionmark.circle"
+        case .rejected: return "xmark.circle"
+        }
+    }
+
+    private func vetColor(_ status: VetStatus) -> Color {
+        switch status {
+        case .autoAccepted, .confirmed: return SwarmTheme.olive
+        case .needsReview: return SwarmTheme.cyan.opacity(0.75)
+        case .rejected: return SwarmTheme.red.opacity(0.7)
+        }
     }
 
     private func cacheShareImage() {
@@ -453,6 +518,7 @@ struct SettingsOverlay: View {
     @State private var colorblindOn = GameSettings.colorblindSpectrogram
     @State private var traineeOn = GameSettings.traineeMode
     @State private var captionsOn = GameSettings.captionsEnabled
+    @State private var conservativeOn = GameSettings.conservativeClassifier
 
     var body: some View {
         ZStack {
@@ -469,6 +535,7 @@ struct SettingsOverlay: View {
                         settingsToggle("Haptics", isOn: $hapticsOn)
                         settingsToggle("Detection captions", isOn: $captionsOn)
                         settingsToggle("Trainee mode", isOn: $traineeOn)
+                        settingsToggle(SurveyProtocolCopy.conservativeClassifier, isOn: $conservativeOn)
                         settingsToggle("Colorblind spectrogram", isOn: $colorblindOn)
                         VStack(alignment: .leading, spacing: 8) {
                             Text("Listen gain \(Int(listenGain * 100))%")
@@ -495,6 +562,7 @@ struct SettingsOverlay: View {
         .onBooleanChange(hapticsOn) { GameSettings.hapticsEnabled = $0 }
         .onBooleanChange(captionsOn) { GameSettings.captionsEnabled = $0 }
         .onBooleanChange(traineeOn) { GameSettings.traineeMode = $0 }
+        .onBooleanChange(conservativeOn) { GameSettings.conservativeClassifier = $0 }
         .onBooleanChange(colorblindOn) { GameSettings.colorblindSpectrogram = $0 }
         .onDoubleChange(listenGain) { GameSettings.listenGain = Float($0) }
     }
@@ -940,6 +1008,14 @@ struct PlayingFieldOverlay: View {
                         .padding(.top, 8)
                         .transition(.opacity.combined(with: .move(edge: .top)))
                 }
+                if let vet = model.vetSession {
+                    VetAnalystPanel(session: vet) { decision in
+                        model.submitVet(decision)
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.top, 8)
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+                }
                 Spacer()
                 if !model.recentVouchers.isEmpty {
                     VoucherFeedStrip(vouchers: model.recentVouchers)
@@ -959,6 +1035,53 @@ struct PlayingFieldOverlay: View {
             }
         }
         .animation(.easeOut(duration: 0.2), value: model.spectrogram)
+        .animation(.easeOut(duration: 0.2), value: model.vetSession?.voucherId)
+    }
+}
+
+private struct VetAnalystPanel: View {
+    let session: VetSession
+    let onDecision: (VetStatus) -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Analyst vet")
+                .font(SwarmTheme.ui(10, .bold))
+                .foregroundColor(SwarmTheme.lime.opacity(0.85))
+            VStack(alignment: .leading, spacing: 2) {
+                Text(session.commonName)
+                    .font(SwarmTheme.ui(14, .bold))
+                    .foregroundColor(SwarmTheme.foam)
+                Text(session.scientificName)
+                    .font(.system(size: 11, weight: .medium, design: .serif))
+                    .italic()
+                    .foregroundColor(SwarmTheme.foam.opacity(0.55))
+                Text("\(Int(session.confidence * 100))% · \(session.clipFilename)")
+                    .font(SwarmTheme.ui(9, .medium))
+                    .foregroundColor(SwarmTheme.cyan.opacity(0.65))
+            }
+            HStack(spacing: 8) {
+                vetButton("Confirm", tint: SwarmTheme.olive) { onDecision(.confirmed) }
+                vetButton("Reject", tint: SwarmTheme.red.opacity(0.85)) { onDecision(.rejected) }
+                vetButton("Review", tint: SwarmTheme.panelMuted) { onDecision(.needsReview) }
+            }
+        }
+        .padding(12)
+        .background(RoundedRectangle(cornerRadius: 12).fill(Color.black.opacity(0.62)))
+        .overlay(RoundedRectangle(cornerRadius: 12).stroke(SwarmTheme.lime.opacity(0.35), lineWidth: 1))
+    }
+
+    private func vetButton(_ title: String, tint: Color, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(title)
+                .font(SwarmTheme.ui(11, .bold))
+                .foregroundColor(.black)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 8)
+                .background(tint)
+                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+        }
+        .buttonStyle(.plain)
     }
 }
 
@@ -972,9 +1095,9 @@ private struct VoucherFeedStrip: View {
                 .foregroundColor(SwarmTheme.foam.opacity(0.45))
             ForEach(vouchers) { v in
                 HStack(spacing: 6) {
-                    Image(systemName: v.validated ? "checkmark.seal.fill" : "questionmark.circle")
+                    Image(systemName: v.vetStatus.isValidated ? "checkmark.seal.fill" : "questionmark.circle")
                         .font(.system(size: 10))
-                        .foregroundColor(v.validated ? SwarmTheme.olive : SwarmTheme.red.opacity(0.7))
+                        .foregroundColor(v.vetStatus.isValidated ? SwarmTheme.olive : SwarmTheme.red.opacity(0.7))
                     VStack(alignment: .leading, spacing: 1) {
                         Text(v.commonName)
                             .font(SwarmTheme.ui(11, .semibold))

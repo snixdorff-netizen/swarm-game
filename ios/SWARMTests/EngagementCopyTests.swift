@@ -26,7 +26,8 @@ final class EngagementCopyTests: XCTestCase {
             surveyScore: surveyScore,
             missionPassed: missionPassed,
             abortReason: abortReason,
-            vouchers: []
+            vouchers: [],
+            presenceRecords: []
         )
     }
 

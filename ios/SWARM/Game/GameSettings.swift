@@ -12,6 +12,7 @@ enum GameSettings {
     static let mentorshipKey = "swarm_mentorship_done"
     static let habitatKey = "swarm_habitat_site"
     static let transectKey = "swarm_transect_mode"
+    static let conservativeKey = "swarm_conservative_classifier"
 
     private static var storage: UserDefaults = .standard
 
@@ -80,5 +81,11 @@ enum GameSettings {
             return mode
         }
         set { storage.set(newValue.rawValue, forKey: transectKey) }
+    }
+
+    /// Kaleidoscope-style "+1 More Accurate (Conservative)" — fewer auto-IDs, more vetting.
+    static var conservativeClassifier: Bool {
+        get { storage.bool(forKey: conservativeKey) }
+        set { storage.set(newValue, forKey: conservativeKey) }
     }
 }

@@ -73,11 +73,22 @@ struct DetectionVoucher: Identifiable, Equatable, Codable {
     let scientificName: String
     let confidence: CGFloat
     let timeSec: Int
-    let validated: Bool
+    let vetStatus: VetStatus
     let deploymentId: String
     let siteLabel: String
     let recorderProfile: String
     let clipFilename: String
+
+    var validated: Bool { vetStatus.isValidated }
+
+    func withVetStatus(_ status: VetStatus) -> DetectionVoucher {
+        DetectionVoucher(
+            id: id, speciesId: speciesId, commonName: commonName, scientificName: scientificName,
+            confidence: confidence, timeSec: timeSec, vetStatus: status,
+            deploymentId: deploymentId, siteLabel: siteLabel, recorderProfile: recorderProfile,
+            clipFilename: clipFilename
+        )
+    }
 }
 
 struct SurveyRunReport: Equatable, Codable {
@@ -96,21 +107,32 @@ struct SurveyRunReport: Equatable, Codable {
     let missionPassed: Bool
     let abortReason: String?
     let vouchers: [DetectionVoucher]
+    let presenceRecords: [SpeciesPresenceRecord]
 
     var scoreBreakdown: String {
-        "Richness \(richness) · Detections \(detections) · Confidence \(Int(meanConfidence * 100))%"
+        let present = presenceRecords.filter { $0.status == .present }.count
+        return "Present \(present) · Richness \(richness) · Detections \(detections) · Confidence \(Int(meanConfidence * 100))%"
     }
 }
 
 enum SurveyScoreEngine {
-    static func confidence(for archetype: Int, listenBurstRecently: Bool) -> CGFloat {
-        switch archetype {
-        case 3: return listenBurstRecently ? 0.74 : 0.41
-        case 9: return listenBurstRecently ? 0.88 : 0.62
-        case 2: return 0.70
-        case 1: return 0.66
-        default: return 0.64
-        }
+    static func confidence(
+        for archetype: Int,
+        listenBurstRecently: Bool,
+        conservative: Bool = GameSettings.conservativeClassifier
+    ) -> CGFloat {
+        let base: CGFloat = {
+            switch archetype {
+            case 3: return listenBurstRecently ? 0.74 : 0.41
+            case 9: return listenBurstRecently ? 0.88 : 0.62
+            case 2: return 0.70
+            case 1: return 0.66
+            default: return 0.64
+            }
+        }()
+        guard conservative else { return base }
+        if archetype == 3 && !listenBurstRecently { return min(base, 0.38) }
+        return base * 0.94
     }
 
     static func compute(
@@ -121,17 +143,21 @@ enum SurveyScoreEngine {
         traineeMode: Bool = false,
         deployment: DeploymentContext? = nil
     ) -> SurveyRunReport {
-        let richness = Set(vouchers.map(\.speciesId)).count
-        let meanConf = vouchers.isEmpty ? 0 : vouchers.map(\.confidence).reduce(0, +) / CGFloat(vouchers.count)
-        let falsePos = vouchers.filter { !$0.validated }.count
-        var score = richness * 120 + vouchers.count * 8 + Int(meanConf * 80) - falsePos * 25 + min(timeSec, mission.transectDurationSec) / 6
+        let scoring = PresenceRollupEngine.scoringVouchers(vouchers)
+        let validated = PresenceRollupEngine.validatedVouchers(vouchers)
+        let presence = PresenceRollupEngine.rollup(vouchers: vouchers)
+        let richness = presence.filter { $0.status == .present }.count
+        let meanConf = validated.isEmpty ? 0 : validated.map(\.confidence).reduce(0, +) / CGFloat(validated.count)
+        let falsePos = vouchers.filter { $0.vetStatus == .rejected }.count
+            + vouchers.filter { $0.vetStatus == .needsReview && $0.speciesId == "mockingbird" }.count
+        var score = richness * 140 + validated.count * 10 + Int(meanConf * 90) - falsePos * 28 + min(timeSec, mission.transectDurationSec) / 6
         if aborted { score = max(0, score - 40) }
 
         let confFloor = traineeMode ? max(0.45, mission.minMeanConfidence - 0.08) : mission.minMeanConfidence
         let detectionFloor = traineeMode ? max(1, mission.targetDetections - 4) : mission.targetDetections
         let richnessFloor = traineeMode ? max(1, mission.targetRichness - 1) : mission.targetRichness
         let passed = !aborted
-            && vouchers.count >= detectionFloor
+            && validated.count >= detectionFloor
             && richness >= richnessFloor
             && meanConf >= confFloor
             && timeSec >= min(120, mission.transectDurationSec / 3)
@@ -147,14 +173,15 @@ enum SurveyScoreEngine {
             recorderProfile: dep.recorderProfile,
             transectMode: dep.transectMode,
             timeSec: timeSec,
-            detections: vouchers.count,
+            detections: validated.count,
             richness: richness,
             meanConfidence: meanConf,
             falsePositives: falsePos,
             surveyScore: score,
             missionPassed: passed,
             abortReason: aborted ? "Noise budget exceeded — deployment aborted" : nil,
-            vouchers: vouchers
+            vouchers: vouchers,
+            presenceRecords: presence
         )
     }
 }

@@ -418,7 +418,7 @@ final class GameScene: SKScene {
         runTime += dt
         if listenBurstTimer > 0 {
             listenBurstTimer -= dt
-            if listenBurstTimer <= 0 { model?.spectrogram = nil }
+            if listenBurstTimer <= 0, model?.vetSession == nil { model?.spectrogram = nil }
         }
         if listenCooldown > 0 { listenCooldown -= dt }
         if listenRecentTimer > 0 { listenRecentTimer -= dt }
@@ -947,12 +947,13 @@ final class GameScene: SKScene {
     private func kill(_ e: Enemy) {
         let project = e.projectSpecies
         let legacy = ProjectSpeciesCatalog.surveySpecies(for: project)
-        let validated = e.kind != 3 || listenRecentTimer > 0
-        let confidence = SurveyScoreEngine.confidence(for: e.kind, listenBurstRecently: listenRecentTimer > 0)
+        let listenRecent = listenRecentTimer > 0
+        let confidence = SurveyScoreEngine.confidence(for: e.kind, listenBurstRecently: listenRecent)
+        let vetStatus = AnalystLoop.initialVetStatus(kind: e.kind, confidence: confidence, listenRecent: listenRecent)
         e.node.removeFromParent()
         if let idx = enemies.firstIndex(where: { $0 === e }) { enemies.remove(at: idx) }
         kills += 1; model?.kills = kills
-        if e.kind == 3 && !validated {
+        if e.kind == 3 && !listenRecent {
             hp = max(0, hp - BalanceEngine.falsePositiveNoisePenalty)
             flashHurt()
             showDetectionBanner("False positive — noise budget −\(Int(BalanceEngine.falsePositiveNoisePenalty))", pulse: true, duration: 1.4)
@@ -964,7 +965,7 @@ final class GameScene: SKScene {
             scientificName: project.scientificName,
             confidence: confidence,
             timeSec: Int(runTime),
-            validated: validated,
+            vetStatus: vetStatus,
             deploymentId: deploymentContext.deploymentId,
             siteLabel: deploymentContext.siteLabel,
             recorderProfile: deploymentContext.recorderProfile,
@@ -973,24 +974,61 @@ final class GameScene: SKScene {
             )
         )
         detectionVouchers.append(voucher)
-        model?.speciesRichness = Set(detectionVouchers.map(\.speciesId)).count
+        refreshSpeciesRichness()
         model?.recentVouchers = Array(detectionVouchers.suffix(3))
-        if !(e.kind == 3 && !validated) {
-            showDetectionBanner(
-                validated ? "Detection: \(project.commonName)" : "Tentative: \(project.commonName)",
-                pulse: false, duration: 1.2
-            )
+        if vetStatus == .needsReview {
+            model?.vetSession = VetSession(voucher: voucher)
+            listenBurstTimer = max(listenBurstTimer, 5.0)
+        }
+        if !(e.kind == 3 && !listenRecent) {
+            showDetectionBanner(detectionBanner(for: project.commonName, status: vetStatus), pulse: false, duration: 1.2)
         }
         checkKillStreak(kills)
         let leech = CGFloat(leechLevel) * 5 + leechPerKill * 1.25
         if leech > 0 { hp = min(maxHp, hp + leech) }
         model?.catalog.record(project, deployMode: deployMode)
         model?.labBoard.noteLocalDetection(species: project, habitat: model?.habitatSite ?? GameSettings.habitatSite, deployMode: deployMode)
-        publishCaption(validated ? "Detection: \(project.commonName)" : "Tentative: \(project.commonName)")
+        publishCaption(detectionBanner(for: project.commonName, status: vetStatus))
         SpeciesCallSynth.shared.playConfirm(species: legacy)
         SfxPlayer.shared.kill(); Haptics.shared.kill()
         burst(at: e.node.position, color: e.node.color)
         archiveRecordingClip(at: e.node.position, value: e.xp)
+    }
+
+    private func detectionBanner(for commonName: String, status: VetStatus) -> String {
+        switch status {
+        case .autoAccepted: return "Detection: \(commonName)"
+        case .confirmed: return "Manual ID confirmed: \(commonName)"
+        case .needsReview: return "Needs review: \(commonName)"
+        case .rejected: return "Rejected: \(commonName)"
+        }
+    }
+
+    private func refreshSpeciesRichness() {
+        let present = PresenceRollupEngine.rollup(vouchers: detectionVouchers)
+            .filter { $0.status == .present }.count
+        model?.speciesRichness = present
+    }
+
+    func applyVetDecision(voucherId: String, decision: VetStatus) {
+        guard let idx = detectionVouchers.firstIndex(where: { $0.id == voucherId }) else { return }
+        let prior = detectionVouchers[idx]
+        detectionVouchers[idx] = prior.withVetStatus(decision)
+        model?.recentVouchers = Array(detectionVouchers.suffix(3))
+        refreshSpeciesRichness()
+        model?.vetSession = nil
+        switch decision {
+        case .confirmed:
+            showDetectionBanner("Manual ID confirmed: \(prior.commonName)", pulse: false, duration: 1.2)
+            publishCaption("Manual ID confirmed: \(prior.commonName)")
+        case .rejected:
+            showDetectionBanner("Rejected (noise): \(prior.commonName)", pulse: true, duration: 1.2)
+            if prior.speciesId == "mockingbird" {
+                hp = min(maxHp, hp + BalanceEngine.falsePositiveNoisePenalty * 0.5)
+            }
+        case .autoAccepted, .needsReview:
+            break
+        }
     }
     private func burst(at p: CGPoint, color: SKColor) {
         for _ in 0..<7 {

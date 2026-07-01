@@ -21,14 +21,22 @@ enum SurveyReportExporter {
             "  Mean confidence: \(Int(report.meanConfidence * 100))%",
             "  False positives: \(report.falsePositives)",
             "",
-            "Detection vouchers",
+            SurveyProtocolCopy.presenceAbsenceHeader,
         ]
+        if report.presenceRecords.isEmpty {
+            lines.append("  (none)")
+        } else {
+            for record in report.presenceRecords {
+                lines.append("  \(record.summaryLine)")
+            }
+        }
+        lines.append("")
+        lines.append("Detection vouchers")
         if report.vouchers.isEmpty {
             lines.append("  (none)")
         } else {
             for v in report.vouchers {
-                let status = v.validated ? SurveyProtocolCopy.validated : SurveyProtocolCopy.tentative
-                lines.append("  \(v.commonName) (\(v.scientificName)) — \(Int(v.confidence * 100))% — \(status) @ \(formatTime(v.timeSec))")
+                lines.append("  \(v.commonName) (\(v.scientificName)) — \(Int(v.confidence * 100))% — \(v.vetStatus.label) @ \(formatTime(v.timeSec))")
                 lines.append("    clip: \(v.clipFilename) · site: \(v.siteLabel) · \(v.recorderProfile)")
             }
         }
@@ -41,12 +49,13 @@ enum SurveyReportExporter {
         var rows = [
             "deployment_id,mission_id,mission_title,site_label,recorder,transect_mode,time_sec,survey_score,mission_passed,detections,richness,mean_confidence,false_positives",
             "\(csv(report.deploymentId)),\(csv(report.missionId)),\(csv(report.missionTitle)),\(csv(report.siteLabel)),\(csv(report.recorderProfile)),\(csv(report.transectMode.rawValue)),\(report.timeSec),\(report.surveyScore),\(report.missionPassed),\(report.detections),\(report.richness),\(String(format: "%.2f", report.meanConfidence)),\(report.falsePositives)",
-            "species_id,common_name,scientific_name,confidence,time_sec,validated,deployment_id,site_label,recorder_profile,clip_filename",
+            "species_id,common_name,scientific_name,confidence,time_sec,auto_id,manual_id,vet_status,deployment_id,site_label,recorder_profile,clip_filename",
         ]
         for v in report.vouchers {
             rows.append([
                 csv(v.speciesId), csv(v.commonName), csv(v.scientificName),
-                String(format: "%.2f", v.confidence), "\(v.timeSec)", "\(v.validated)",
+                String(format: "%.2f", v.confidence), "\(v.timeSec)",
+                csv(v.vetStatus.autoIdColumn), csv(v.vetStatus.manualIdColumn), csv(v.vetStatus.rawValue),
                 csv(v.deploymentId), csv(v.siteLabel), csv(v.recorderProfile), csv(v.clipFilename),
             ].joined(separator: ","))
         }

@@ -18,6 +18,7 @@ Beat your best **survey score**.
 - **P2 joy wave** — habitat sites, mentorship checklist, lab board, citizen-science CSV export, pause/gain/captions/colorblind spectrogram.
 - **P3 trust wave** — voucher metadata (deployment ID, site, recorder, clip filename), coffee-break vs field-day transect toggle, lab board honesty label, README sync.
 - **P4 credibility wave** — combat de-emphasis (no DPS floaters, auto-archived clips, drift-not-chase), passive SM5BAT monitor (stationary rig, crossing passes, emergence window).
+- **P5 analyst loop** — Kaleidoscope-style vet panel (Confirm / Reject / Needs review), presence/absence rollup on game-over, conservative classifier toggle, CSV `auto_id`/`manual_id`/`vet_status` columns.
 - **Meta-progression** — earn survey grants each deployment, spend in Field Lab on permanent rig upgrades.
 
 ## Project species (12)
