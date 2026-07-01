@@ -147,6 +147,8 @@ final class GameScene: SKScene {
     private let maxEnemies = 130
     private var autopilotMovement = false   // kiting movement (SWARM_AUTOSTART / headless batch)
     private var playerInvulnerable = false // skips hp-= (SWARM_AUTOSTART only; mortal batch uses false)
+    private var casualAutopilot = false    // imperfect kiting when mortal (headless / SWARM_MORTAL_AUTOSTART)
+    private var spawnRng: SeededRNG?
     var testingRunProfile: BuildProfile?
 
     // MARK: - Setup
@@ -162,7 +164,15 @@ final class GameScene: SKScene {
         buildBossWarn()
         cam.position = pPos
         setChrome(false)
-        if ProcessInfo.processInfo.environment["SWARM_AUTOSTART"] != nil {
+        let env = ProcessInfo.processInfo.environment
+        if env["SWARM_MORTAL_AUTOSTART"] != nil {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+                self?.startRun()
+                self?.autopilotMovement = true
+                self?.playerInvulnerable = false
+                self?.casualAutopilot = true
+            }
+        } else if env["SWARM_AUTOSTART"] != nil {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
                 self?.startRun()
                 self?.autopilotMovement = true
@@ -273,7 +283,7 @@ final class GameScene: SKScene {
         bossSpawned = false; bossWarnLabel.isHidden = true
         let meta = model?.meta
         dmgMult = meta?.damageMult ?? 1
-        hp = 96 + (meta?.bonusHp ?? 0); maxHp = hp
+        hp = 100 + (meta?.bonusHp ?? 0); maxHp = hp
         moveSpeed = 178 * (meta?.speedMult ?? 1)
         pickupRadius = 78 + (meta?.bonusMagnet ?? 0); regen = 0
         boltDmg = 12; boltInterval = 0.72; boltTimer = 0; boltCount = 1; boltPierce = 0
@@ -342,11 +352,14 @@ final class GameScene: SKScene {
 
         runTime += dt
         if autopilotMovement {
+            let casual = casualAutopilot && !playerInvulnerable
+            let fleeR = casual ? BalanceEngine.casualAutopilotFleeRadius : 220
+            let fleeStr = casual ? BalanceEngine.casualAutopilotEfficiency : 0.88
             var fleeX: CGFloat = 0, fleeY: CGFloat = 0, nearby = 0
             for e in enemies {
                 let dx = pPos.x - e.node.position.x, dy = pPos.y - e.node.position.y
                 let d2 = dx*dx + dy*dy
-                if d2 < 220 * 220 {
+                if d2 < fleeR * fleeR {
                     let d = max(1, d2.squareRoot())
                     fleeX += dx / d
                     fleeY += dy / d
@@ -355,21 +368,28 @@ final class GameScene: SKScene {
             }
             if nearby > 0 {
                 let d = max(1, (fleeX*fleeX + fleeY*fleeY).squareRoot())
-                moveDir = CGVector(dx: fleeX/d * 0.88 + (-fleeY/d) * 0.28, dy: fleeY/d * 0.88 + (fleeX/d) * 0.28)
+                moveDir = CGVector(dx: fleeX/d * fleeStr + (-fleeY/d) * 0.28, dy: fleeY/d * fleeStr + (fleeX/d) * 0.28)
             } else if let e = nearestEnemy() {
                 let dx = pPos.x - e.node.position.x, dy = pPos.y - e.node.position.y
                 let d = max(1, (dx*dx + dy*dy).squareRoot())
-                moveDir = CGVector(dx: dx/d, dy: dy/d)
+                moveDir = CGVector(dx: dx/d * fleeStr, dy: dy/d * fleeStr)
             } else {
                 moveDir = CGVector(dx: cos(runTime * 1.1), dy: sin(runTime * 1.1))
+            }
+            if casual {
+                let wobble = sin(runTime * 5.1) * 0.34 * (1 - BalanceEngine.casualAutopilotEfficiency)
+                moveDir = CGVector(dx: moveDir.dx + wobble, dy: moveDir.dy - wobble * 0.65)
+                let mag = max(0.38, (moveDir.dx*moveDir.dx + moveDir.dy*moveDir.dy).squareRoot())
+                moveDir = CGVector(dx: moveDir.dx / mag, dy: moveDir.dy / mag)
             }
         }
         if regen > 0 && hp < maxHp { hp = min(maxHp, hp + regen * dt) }
         if hurtCooldown > 0 { hurtCooldown -= dt }
 
         // Move player
-        pPos.x += moveDir.dx * moveSpeed * dt
-        pPos.y += moveDir.dy * moveSpeed * dt
+        let moveScale: CGFloat = (casualAutopilot && !playerInvulnerable) ? BalanceEngine.casualAutopilotEfficiency : 1
+        pPos.x += moveDir.dx * moveSpeed * dt * moveScale
+        pPos.y += moveDir.dy * moveSpeed * dt * moveScale
         player.position = pPos
         cam.position = pPos
 
@@ -408,6 +428,9 @@ final class GameScene: SKScene {
     }
 
     private func checkKillStreak(_ totalKills: Int) {
+        // Boss anticipation (75–90s) outranks streak pop-ups — keeps casual players oriented.
+        if runTime >= CGFloat(BalanceEngine.bossTeaseSeconds),
+           runTime < BalanceEngine.bossSpawnSeconds { return }
         guard BalanceEngine.killStreakThresholds.contains(totalKills),
               !hitKillStreaks.contains(totalKills),
               let banner = BalanceEngine.killStreakBanner(for: totalKills) else { return }
@@ -467,11 +490,20 @@ final class GameScene: SKScene {
             for _ in 0..<batch { spawnOne() }
         }
     }
+    private func spawnUnit() -> CGFloat {
+        if var rng = spawnRng {
+            let v = CGFloat(rng.nextUnit())
+            spawnRng = rng
+            return v
+        }
+        return CGFloat.random(in: 0..<1)
+    }
+
     private func spawnOne() {
-        let ang = CGFloat.random(in: 0..<(2 * .pi))
+        let ang = spawnUnit() * (2 * .pi)
         let dist = max(size.width, size.height) * 0.56
         let pos = CGPoint(x: pPos.x + cos(ang) * dist, y: pPos.y + sin(ang) * dist)
-        let roll = CGFloat.random(in: 0..<1)
+        let roll = spawnUnit()
         let kind = BalanceEngine.enemyKind(runTime: runTime, roll: roll)
         let stats = BalanceEngine.enemyStats(kind: kind, runTime: runTime)
         var color = C.basic, sz: CGFloat = 22
@@ -503,7 +535,7 @@ final class GameScene: SKScene {
             self?.bossWarnLabel.isHidden = true; self?.bossWarnLabel.alpha = 1
             if self?.model?.runBanner == "⚠ BOSS INCOMING" { self?.model?.runBanner = nil }
         }]))
-        let ang = CGFloat.random(in: 0..<(2 * .pi))
+        let ang = spawnUnit() * (2 * .pi)
         let dist = max(size.width, size.height) * 0.5
         let pos = CGPoint(x: pPos.x + cos(ang) * dist, y: pPos.y + sin(ang) * dist)
         let stats = BalanceEngine.enemyStats(kind: .boss, runTime: runTime)
@@ -547,8 +579,14 @@ final class GameScene: SKScene {
                         let odx = pPos.x - other.node.position.x, ody = pPos.y - other.node.position.y
                         if odx*odx + ody*ody < 52 * 52 { pack += 1 }
                     }
-                    let packMult = 1 + CGFloat(min(pack, 8)) * 0.05
-                    hp -= e.dmg * BalanceEngine.difficultyScale(runTime: runTime) * packMult
+                    let packMult = 1 + CGFloat(min(pack, 8)) * 0.04
+                    let timeDmgScale: CGFloat = {
+                        if runTime < 26 { return 0.76 }
+                        if runTime > 100 { return 1.55 }
+                        if runTime > 88 { return 1.38 }
+                        return 1.0
+                    }()
+                    hp -= e.dmg * BalanceEngine.difficultyScale(runTime: runTime) * packMult * timeDmgScale
                     flashHurt()
                 }
                 hurtCooldown = BalanceEngine.contactHurtCooldown
@@ -573,7 +611,11 @@ final class GameScene: SKScene {
             s.life -= dt
             let dx = pPos.x - s.node.position.x, dy = pPos.y - s.node.position.y
             if dx*dx + dy*dy < 18*18 && hurtCooldown <= 0 {
-                if !playerInvulnerable { hp -= s.dmg; flashHurt() }
+                if !playerInvulnerable {
+                    let shotScale: CGFloat = runTime > 55 ? 1.12 : 1.0
+                    hp -= s.dmg * shotScale
+                    flashHurt()
+                }
                 hurtCooldown = BalanceEngine.shotHurtCooldown
                 s.life = 0
             }
@@ -735,7 +777,7 @@ final class GameScene: SKScene {
         if let idx = enemies.firstIndex(where: { $0 === e }) { enemies.remove(at: idx) }
         kills += 1; model?.kills = kills
         checkKillStreak(kills)
-        let leech = CGFloat(leechLevel) * 3 + leechPerKill
+        let leech = CGFloat(leechLevel) * 5 + leechPerKill * 1.25
         if leech > 0 { hp = min(maxHp, hp + leech) }
         SfxPlayer.shared.kill(); Haptics.shared.kill()
         burst(at: e.node.position, color: e.node.color)
@@ -897,6 +939,15 @@ extension GameScene {
         set { playerInvulnerable = newValue }
     }
 
+    var testingCasualAutopilot: Bool {
+        get { casualAutopilot }
+        set { casualAutopilot = newValue }
+    }
+
+    func testing_setSpawnSeed(_ seed: UInt64) {
+        spawnRng = SeededRNG(seed: seed)
+    }
+
     var testingHp: CGFloat { hp }
     var testingRunTime: CGFloat { runTime }
     var testingBossSpawned: Bool { bossSpawned }
@@ -910,11 +961,19 @@ extension GameScene {
     }
 
     func testing_applyRunProfile(_ profile: BuildProfile) {
-        guard profile == .metaBoosted else { return }
-        dmgMult = max(dmgMult, 1.15)
-        xpMult = max(xpMult, 1.08)
-        maxHp += 16
-        hp += 16
+        switch profile {
+        case .metaBoosted:
+            dmgMult = max(dmgMult, 1.15)
+            xpMult = max(xpMult, 1.08)
+            maxHp += 16
+            hp += 16
+        case .leechTank:
+            maxHp += 28
+            hp += 28
+            leechLevel = 1
+        default:
+            break
+        }
     }
 
     func testing_resolveLevelUpIfNeeded(preferring profile: BuildProfile? = nil) {
@@ -1021,7 +1080,8 @@ extension GameScene {
             milestone60: hitMilestones.contains(60),
             finalHp: max(0, Int(hp)),
             autopilotMovement: autopilotMovement,
-            playerInvulnerable: playerInvulnerable
+            playerInvulnerable: playerInvulnerable,
+            casualAutopilot: casualAutopilot
         )
     }
 }

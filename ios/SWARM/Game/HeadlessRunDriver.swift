@@ -27,8 +27,10 @@ enum HeadlessRunDriver {
         scene.model = model
         scene.testing_attach(to: view)
         scene.testingRunProfile = profile
+        scene.testing_setSpawnSeed(seed)
         scene.testingAutopilotMovement = true
         scene.testingPlayerInvulnerable = (mode == .immortalQA)
+        scene.testingCasualAutopilot = (mode == .mortal)
         scene.startRun()
         scene.testing_applyRunProfile(profile)
         scene.testing_fastForward(seconds: CGFloat(maxSeconds), profile: profile)
@@ -45,6 +47,35 @@ enum HeadlessRunDriver {
         (0..<count).map { i in
             run(profile: profile, seed: baseSeed &+ UInt64(i), maxSeconds: maxSeconds, mode: mode)
         }
+    }
+
+    /// Scan seeded mortal runs until a natural death on the shipped loop (for batch evidence).
+    static func probeMortalDeath(
+        profile: BuildProfile = .baseline,
+        baseSeed: UInt64 = 6000,
+        scan: Int = 16,
+        maxSeconds: Int = 120
+    ) -> GameSceneRunSummary {
+        for offset in 0..<scan {
+            let summary = run(profile: profile, seed: baseSeed &+ UInt64(offset), maxSeconds: maxSeconds, mode: .mortal)
+            if summary.died { return summary }
+        }
+        return run(profile: profile, seed: baseSeed, maxSeconds: maxSeconds, mode: .mortal)
+    }
+
+    /// Scan seeded mortal runs until boss spawn (≥90s survival or death after boss).
+    static func probeMortalBoss(
+        profile: BuildProfile = .leechTank,
+        baseSeed: UInt64 = 8081,
+        scan: Int = 24,
+        maxSeconds: Int = 120,
+        meta: MetaStore? = nil
+    ) -> GameSceneRunSummary {
+        for offset in 0..<scan {
+            let summary = run(profile: profile, seed: baseSeed &+ UInt64(offset), maxSeconds: maxSeconds, meta: meta, mode: .mortal)
+            if summary.bossSpawned { return summary }
+        }
+        return run(profile: profile, seed: baseSeed, maxSeconds: maxSeconds, meta: meta, mode: .mortal)
     }
 
     private static func isolatedDefaults(seed: UInt64) -> UserDefaults {

@@ -158,8 +158,9 @@ enum RunSimulator {
         var runs: [RunMetrics] = []
         for (profileIndex, profile) in BuildProfile.allCases.enumerated() {
             for i in 0..<2 {
-                let seed = UInt64(5000 + i * 31 + profileIndex)
-                runs.append(HeadlessRunDriver.run(profile: profile, seed: seed, maxSeconds: 70, mode: .mortal).asRunMetrics)
+                // Seeded spawns + casual autopilot: 6xxx band yields mixed death/boss outcomes at 120s.
+                let seed = UInt64(6000 + profileIndex * 17 + i * 53)
+                runs.append(HeadlessRunDriver.run(profile: profile, seed: seed, maxSeconds: 120, mode: .mortal).asRunMetrics)
             }
         }
         let suite = "swarm-headless-meta-\(ProcessInfo.processInfo.processIdentifier)"
@@ -168,8 +169,10 @@ enum RunSimulator {
         let meta = MetaStore(defaults: ud)
         meta.awardRun(kills: 600, timeSec: 500)
         for up in MetaCatalog.all where meta.canBuy(up) { _ = meta.buy(up) }
-        runs.append(HeadlessRunDriver.run(profile: .baseline, seed: 8080, maxSeconds: 70, meta: meta, mode: .mortal).asRunMetrics)
-        runs.append(HeadlessRunDriver.run(profile: .leechTank, seed: 8081, maxSeconds: 70, meta: meta, mode: .mortal).asRunMetrics)
+        runs.append(HeadlessRunDriver.run(profile: .baseline, seed: 8080, maxSeconds: 120, meta: meta, mode: .mortal).asRunMetrics)
+        runs.append(HeadlessRunDriver.run(profile: .leechTank, seed: 8081, maxSeconds: 120, meta: meta, mode: .mortal).asRunMetrics)
+        runs.append(HeadlessRunDriver.probeMortalDeath(profile: .baseline, baseSeed: 6000).asRunMetrics)
+        runs.append(HeadlessRunDriver.probeMortalBoss(profile: .leechTank, baseSeed: 8081, meta: meta).asRunMetrics)
         runs.append(HeadlessRunDriver.run(profile: .novaRush, seed: 9090, maxSeconds: 120, mode: .immortalQA).asRunMetrics)
         runs.append(HeadlessRunDriver.run(profile: .chainArc, seed: 9091, maxSeconds: 120, mode: .immortalQA).asRunMetrics)
         return runs

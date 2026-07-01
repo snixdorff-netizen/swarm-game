@@ -101,6 +101,9 @@ enum BalanceEngine {
     static let playerContactPadding: CGFloat = 13
     /// Autopilot kiter in SWARM_AUTOSTART avoids most hits; mortal sim uses this proc scale.
     static let skilledKiterEfficiency: CGFloat = 0.30
+    /// Headless mortal batch: imperfect one-thumb kiting for casual mobile target users.
+    static let casualAutopilotEfficiency: CGFloat = 0.52
+    static let casualAutopilotFleeRadius: CGFloat = 178
 
     /// Weighted mean enemy mix at `runTime` using the same roll thresholds as spawnOne.
     static func expectedEnemyMix(runTime: CGFloat) -> EnemyStatBlock {

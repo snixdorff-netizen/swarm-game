@@ -17,6 +17,7 @@ struct GameSceneRunSummary: Codable, Equatable {
     let finalHp: Int
     let autopilotMovement: Bool
     let playerInvulnerable: Bool
+    let casualAutopilot: Bool
 }
 
 enum GameSceneRunEvidenceExporter {
