@@ -29,6 +29,7 @@ final class SfxPlayer {
     }
 
     func play(freq: Double, duration: Double, volume: Float = 0.35, attack: Double = 0.008, decay: Double = 0.92) {
+        guard GameSettings.soundEnabled else { return }
         ensureRunning()
         let sr = format.sampleRate
         let frames = AVAudioFrameCount(sr * duration)
@@ -80,10 +81,12 @@ final class Haptics {
         }
     }
 
-    func hit() { light.impactOccurred(intensity: 0.5) }
-    func kill() { medium.impactOccurred(intensity: 0.65) }
-    func hurt() { heavy.impactOccurred(intensity: 0.9) }
-    func levelUp() { notify.notificationOccurred(.success) }
-    func death() { notify.notificationOccurred(.error) }
-    func boss() { heavy.impactOccurred(intensity: 1) }
+    private func tap(_ block: () -> Void) { guard GameSettings.hapticsEnabled else { return }; block() }
+
+    func hit() { tap { light.impactOccurred(intensity: 0.5) } }
+    func kill() { tap { medium.impactOccurred(intensity: 0.65) } }
+    func hurt() { tap { heavy.impactOccurred(intensity: 0.9) } }
+    func levelUp() { tap { notify.notificationOccurred(.success) } }
+    func death() { tap { notify.notificationOccurred(.error) } }
+    func boss() { tap { heavy.impactOccurred(intensity: 1) } }
 }

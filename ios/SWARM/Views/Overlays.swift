@@ -30,10 +30,25 @@ private struct NeonButton: ButtonStyle {
 
 struct MenuOverlay: View {
     @ObservedObject var model: GameModel
+    @ObservedObject private var gameCenter = GameCenterManager.shared
+    @AppStorage("swarm_seen_hint") private var seenHint = false
+
     var body: some View {
         ZStack {
             SwarmTheme.bg.opacity(0.88).ignoresSafeArea()
             VStack(spacing: 10) {
+                HStack {
+                    Spacer()
+                    Button { model.openSettings() } label: {
+                        Image(systemName: "gearshape.fill")
+                            .font(.system(size: 22, weight: .semibold))
+                            .foregroundColor(SwarmTheme.foam.opacity(0.7))
+                            .padding(12)
+                    }
+                }
+                .padding(.horizontal, 12)
+                .padding(.top, 8)
+
                 Spacer()
                 Text("SWARM")
                     .font(SwarmTheme.title(76)).foregroundColor(SwarmTheme.cyan)
@@ -49,8 +64,14 @@ struct MenuOverlay: View {
                     Text("\(model.cores) cores")
                         .font(SwarmTheme.ui(14, .bold)).foregroundColor(SwarmTheme.cyan)
                 }.padding(.top, 4)
+                Text(gameCenter.statusLine)
+                    .font(SwarmTheme.ui(11))
+                    .foregroundColor(SwarmTheme.foam.opacity(gameCenter.isAvailable ? 0.45 : 0.3))
                 Spacer()
                 VStack(spacing: 14) {
+                    if !seenHint {
+                        FirstRunHint { seenHint = true }
+                    }
                     Button("Play") { model.start() }.buttonStyle(NeonButton())
                     Button("Upgrades") { model.openMeta() }.buttonStyle(NeonButton(tint: Color(white: 0.22)))
                     Text("Drag to move · weapons fire on their own · grab the green to level up")
@@ -60,6 +81,31 @@ struct MenuOverlay: View {
                 .padding(.horizontal, 36).padding(.bottom, 48)
             }
         }
+    }
+}
+
+private struct FirstRunHint: View {
+    let onDismiss: () -> Void
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text("Quick start")
+                    .font(SwarmTheme.ui(14, .bold))
+                    .foregroundColor(SwarmTheme.lime)
+                Spacer()
+                Button(action: onDismiss) {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundColor(SwarmTheme.foam.opacity(0.45))
+                }
+            }
+            Text("Drag anywhere to move. Weapons auto-fire. Collect green gems to level up and pick upgrades.")
+                .font(SwarmTheme.ui(12))
+                .foregroundColor(SwarmTheme.foam.opacity(0.75))
+                .multilineTextAlignment(.leading)
+        }
+        .padding(14)
+        .background(RoundedRectangle(cornerRadius: 14).fill(Color(white: 0.12)))
+        .overlay(RoundedRectangle(cornerRadius: 14).stroke(SwarmTheme.cyan.opacity(0.3), lineWidth: 1))
     }
 }
 
@@ -116,6 +162,9 @@ private struct ChoiceCard: View {
 
 struct GameOverOverlay: View {
     @ObservedObject var model: GameModel
+    @State private var shareImage: UIImage?
+    @State private var showShare = false
+
     var body: some View {
         ZStack {
             SwarmTheme.bg.opacity(0.9).ignoresSafeArea()
@@ -137,10 +186,27 @@ struct GameOverOverlay: View {
                 Spacer()
                 VStack(spacing: 12) {
                     Button("Run again") { model.start() }.buttonStyle(NeonButton(tint: SwarmTheme.cyan))
+                    Button("Share") { presentShare() }.buttonStyle(NeonButton(tint: SwarmTheme.lime))
                     Button("Menu") { model.restart() }.buttonStyle(NeonButton(tint: Color(white: 0.3)))
                 }.padding(.horizontal, 36).padding(.bottom, 48)
             }
         }
+        .sheet(isPresented: $showShare) {
+            if let shareImage {
+                ActivityShareSheet(items: [shareImage, "Outlast the horde — SWARM"])
+            }
+        }
+    }
+
+    private func presentShare() {
+        let payload = DeathSharePayload(
+            timeSec: model.timeSec,
+            kills: model.kills,
+            level: model.level,
+            bestTime: model.bestTime
+        )
+        shareImage = ShareCardRenderer.image(for: payload)
+        showShare = shareImage != nil
     }
     private func stat(_ v: String, _ l: String) -> some View {
         VStack(spacing: 2) {
@@ -226,6 +292,51 @@ struct MetaOverlay: View {
             }
         }
         .padding(12)
+        .background(RoundedRectangle(cornerRadius: 14).fill(Color(white: 0.1)))
+        .overlay(RoundedRectangle(cornerRadius: 14).stroke(SwarmTheme.cyan.opacity(0.25), lineWidth: 1))
+    }
+}
+
+struct SettingsOverlay: View {
+    @ObservedObject var model: GameModel
+    @State private var soundOn = GameSettings.soundEnabled
+    @State private var hapticsOn = GameSettings.hapticsEnabled
+
+    var body: some View {
+        ZStack {
+            SwarmTheme.bg.opacity(0.94).ignoresSafeArea()
+            VStack(spacing: 20) {
+                Text("SETTINGS")
+                    .font(SwarmTheme.title(32))
+                    .foregroundColor(SwarmTheme.cyan)
+                    .padding(.top, 28)
+
+                VStack(spacing: 12) {
+                    settingsToggle("Sound", isOn: $soundOn)
+                    settingsToggle("Haptics", isOn: $hapticsOn)
+                }
+                .padding(.horizontal, 28)
+
+                Spacer()
+
+                Button("Back") { model.closeSettings() }
+                    .buttonStyle(NeonButton(tint: Color(white: 0.28)))
+                    .padding(.horizontal, 36)
+                    .padding(.bottom, 48)
+            }
+        }
+        .onChange(of: soundOn) { GameSettings.soundEnabled = $0 }
+        .onChange(of: hapticsOn) { GameSettings.hapticsEnabled = $0 }
+    }
+
+    private func settingsToggle(_ title: String, isOn: Binding<Bool>) -> some View {
+        Toggle(isOn: isOn) {
+            Text(title)
+                .font(SwarmTheme.ui(17, .semibold))
+                .foregroundColor(SwarmTheme.foam)
+        }
+        .tint(SwarmTheme.cyan)
+        .padding(14)
         .background(RoundedRectangle(cornerRadius: 14).fill(Color(white: 0.1)))
         .overlay(RoundedRectangle(cornerRadius: 14).stroke(SwarmTheme.cyan.opacity(0.25), lineWidth: 1))
     }

@@ -8,6 +8,7 @@ they die, and you level up to pick build-defining upgrades. The longer you last,
 gets. One life. Beat your best time.
 
 ## Status
+- **Beta-ready (0.9.0)** — TestFlight tooling, unit tests, CI, Game Center leaderboard, shareable death card, settings.
 - **Real, working iOS app** — compiles, runs on simulator, full loop:
   menu → play → level-up choices → death → stats → retry.
 - Flat neon geometry (no art-asset dependency), camera-follow world, in-scene HUD.
@@ -38,10 +39,27 @@ open SWARM.xcodeproj           # set your signing Team for device, then Run
 Simulator build (no signing):
 ```bash
 cd ios
+xcodegen generate
 xcodebuild -project SWARM.xcodeproj -scheme SWARM -sdk iphonesimulator \
   -destination 'platform=iOS Simulator,name=iPhone 17' \
   -configuration Debug CODE_SIGNING_ALLOWED=NO build
 ```
+Unit tests:
+```bash
+cd ios
+xcodebuild test -project SWARM.xcodeproj -scheme SWARM -sdk iphonesimulator \
+  -destination 'platform=iOS Simulator,name=iPhone 17' CODE_SIGNING_ALLOWED=NO
+```
+
+## TestFlight
+Beta tester instructions: **[TESTING.md](TESTING.md)**
+
+Build an App Store IPA for upload:
+```bash
+chmod +x scripts/build-testflight.sh   # one-time
+DEVELOPMENT_TEAM=YOUR_TEAM_ID ./scripts/build-testflight.sh
+```
+Requires a valid Apple Developer account and automatic signing with the Game Center capability enabled for `ai.swarm.game`.
 
 ## Layout
 ```
@@ -54,7 +72,10 @@ swarm/
       ├─ Game/GameScene.swift      All gameplay (movement, weapons, hordes, XP, juice)
       ├─ Game/Feedback.swift       Procedural SFX + Core Haptics
       ├─ Game/MetaStore.swift      Cores + permanent upgrades (UserDefaults)
-      ├─ Views/Overlays.swift      Menu / level-up / game-over / meta shop UI
+      ├─ Game/GameCenterManager.swift  Leaderboard auth + best-time submit
+      ├─ Game/GameSettings.swift   Sound / haptics toggles (UserDefaults)
+      ├─ Views/Overlays.swift      Menu / level-up / game-over / meta / settings UI
+      ├─ Views/ShareCard.swift     Shareable death-summary card renderer
       └─ Resources/                Assets.xcassets (app icon + accent)
 ```
 
@@ -63,7 +84,6 @@ Launching with the `SWARM_AUTOSTART=1` environment variable auto-starts a run an
 auto-pilot (damage-immune) for headless screenshots. Gated entirely by that env var — safe to leave in.
 
 ## Next steps (toward a shippable hit)
-- Game Center leaderboard (best survival time) + shareable death card.
 - More weapons + enemy archetypes; second boss tier.
-- TestFlight (needs Apple Developer signing).
+- App Store release after beta feedback.
 - Custom art pass + soundtrack.

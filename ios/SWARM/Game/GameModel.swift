@@ -13,7 +13,7 @@ struct UpgradeCard: Identifiable {
 }
 
 final class GameModel: ObservableObject {
-    enum Phase { case menu, playing, levelUp, dead, meta }
+    enum Phase { case menu, playing, levelUp, dead, meta, settings }
 
     @Published var phase: Phase = .menu
     @Published var choices: [UpgradeCard] = []
@@ -45,6 +45,8 @@ final class GameModel: ObservableObject {
     func restart() { onRestart() }
     func openMeta() { phase = .meta }
     func closeMeta() { phase = .menu }
+    func openSettings() { phase = .settings }
+    func closeSettings() { phase = .menu }
     func buyMeta(_ id: String) {
         guard let up = MetaCatalog.all.first(where: { $0.id == id }) else { return }
         meta.buy(up)

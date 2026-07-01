@@ -697,7 +697,9 @@ final class GameScene: SKScene {
         model?.level = level
         let earned = kills + max(1, t / 12)
         model?.coresEarned = earned
-        model?.meta.awardRun(kills: kills, timeSec: t)
+        if model?.meta.awardRun(kills: kills, timeSec: t) == true {
+            GameCenterManager.shared.submitBestTime(t)
+        }
         SfxPlayer.shared.death(); Haptics.shared.death()
         model?.phase = .dead
         sticking = false; moveDir = .zero; stickBase.isHidden = true; stickKnob.isHidden = true

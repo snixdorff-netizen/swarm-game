@@ -29,12 +29,13 @@ final class MetaStore: ObservableObject {
     @Published private(set) var bestTime: Int
     @Published private(set) var levels: [String: Int]
 
-    private let ud = UserDefaults.standard
+    private let ud: UserDefaults
     private let coresKey = "swarm_cores"
     private let bestKey = "swarm_best"
     private let levelsKey = "swarm_meta_levels"
 
-    init() {
+    init(defaults: UserDefaults = .standard) {
+        ud = defaults
         cores = ud.integer(forKey: coresKey)
         bestTime = ud.integer(forKey: bestKey)
         levels = (ud.dictionary(forKey: levelsKey) as? [String: Int]) ?? [:]
@@ -59,11 +60,14 @@ final class MetaStore: ObservableObject {
         return true
     }
 
-    func awardRun(kills: Int, timeSec: Int) {
+    @discardableResult
+    func awardRun(kills: Int, timeSec: Int) -> Bool {
         let earned = kills + max(1, timeSec / 12)
         cores += earned
-        if timeSec > bestTime { bestTime = timeSec }
+        let newBest = timeSec > bestTime
+        if newBest { bestTime = timeSec }
         persist()
+        return newBest
     }
 
     var damageMult: CGFloat { 1 + CGFloat(level(for: "meta_dmg")) * 0.04 }

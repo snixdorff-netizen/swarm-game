@@ -6,8 +6,8 @@ options:
   createIntermediateGroups: true
 settings:
   base:
-    MARKETING_VERSION: "1.0"
-    CURRENT_PROJECT_VERSION: "1"
+    MARKETING_VERSION: "0.9.0"
+    CURRENT_PROJECT_VERSION: "2"
     SWIFT_VERSION: "5.0"
     DEVELOPMENT_TEAM: ""
     CODE_SIGN_STYLE: Automatic
@@ -17,18 +17,44 @@ targets:
     platform: iOS
     sources:
       - path: SWARM
+    entitlements:
+      path: SWARM/SWARM.entitlements
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: ai.swarm.game
         PRODUCT_NAME: SWARM
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        ENABLE_TESTABILITY: YES
     info:
       path: SWARM/Resources/Info.generated.plist
       properties:
         CFBundleDisplayName: SWARM
+        CFBundleShortVersionString: "$(MARKETING_VERSION)"
+        CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
         UILaunchScreen: {}
         UIStatusBarHidden: true
         UIRequiresFullScreen: true
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
+  SWARMTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: SWARMTests
+    dependencies:
+      - target: SWARM
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: ai.swarm.game.tests
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/SWARM.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/SWARM"
+schemes:
+  SWARM:
+    build:
+      targets:
+        SWARM: all
+        SWARMTests: [test]
+    test:
+      targets:
+        - SWARMTests

@@ -7,6 +7,11 @@ import SpriteKit
 @main
 struct SwarmApp: App {
     @StateObject private var host = GameHost()
+
+    init() {
+        GameCenterManager.shared.authenticate()
+    }
+
     var body: some Scene {
         WindowGroup {
             GameRootView(host: host)
@@ -45,6 +50,7 @@ struct GameRootView: View {
             case .levelUp: LevelUpOverlay(model: model)
             case .dead: GameOverOverlay(model: model)
             case .meta: MetaOverlay(model: model)
+            case .settings: SettingsOverlay(model: model)
             case .playing: EmptyView()
             }
         }
