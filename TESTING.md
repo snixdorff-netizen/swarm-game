@@ -1,6 +1,6 @@
 # SWARM — Beta Testing Guide
 
-Thank you for helping test SWARM before release. This build is **0.9.0** — feature-complete for beta, still tuning balance and polish.
+Thank you for helping test SWARM before release. Check TestFlight for the current version — feature-complete for beta, still tuning balance and polish.
 
 ## Install (TestFlight)
 
@@ -60,4 +60,4 @@ Send feedback via TestFlight’s **Send Beta Feedback** (screenshot + notes) or 
 
 ## Privacy
 
-SWARM stores progress locally (cores, upgrades, best time). Game Center sends your best survival time to Apple’s leaderboard when signed in. No account is required to play offline.
+SWARM stores progress locally: cores, upgrades, best time, sound/haptics preferences, and whether you dismissed the first-run hint. Game Center sends your best survival time to Apple’s leaderboard when signed in. No account is required to play offline.

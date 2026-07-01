@@ -51,10 +51,10 @@ struct DeathShareCardView: View {
 
 enum ShareCardRenderer {
     @MainActor
-    static func image(for payload: DeathSharePayload) -> UIImage? {
+    static func image(for payload: DeathSharePayload, scale: CGFloat = 2.0) -> UIImage? {
         let view = DeathShareCardView(payload: payload)
         let renderer = ImageRenderer(content: view)
-        renderer.scale = UIScreen.main.scale
+        renderer.scale = scale
         return renderer.uiImage
     }
 }
@@ -62,9 +62,27 @@ enum ShareCardRenderer {
 struct ActivityShareSheet: UIViewControllerRepresentable {
     let items: [Any]
 
-    func makeUIViewController(context: Context) -> UIActivityViewController {
-        UIActivityViewController(activityItems: items, applicationActivities: nil)
+    func makeCoordinator() -> Coordinator { Coordinator() }
+
+    func makeUIViewController(context: Context) -> UIViewController {
+        let host = UIViewController()
+        host.view.backgroundColor = .clear
+        context.coordinator.host = host
+        DispatchQueue.main.async {
+            let activity = UIActivityViewController(activityItems: items, applicationActivities: nil)
+            if let popover = activity.popoverPresentationController {
+                popover.sourceView = host.view
+                popover.sourceRect = CGRect(x: host.view.bounds.midX, y: host.view.bounds.midY, width: 1, height: 1)
+                popover.permittedArrowDirections = .any
+            }
+            host.present(activity, animated: true)
+        }
+        return host
     }
 
-    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
+    func updateUIViewController(_ uiViewController: UIViewController, context: Context) {}
+
+    final class Coordinator {
+        weak var host: UIViewController?
+    }
 }

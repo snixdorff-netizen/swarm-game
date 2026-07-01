@@ -8,9 +8,14 @@ settings:
   base:
     MARKETING_VERSION: "0.9.0"
     CURRENT_PROJECT_VERSION: "2"
-    SWIFT_VERSION: "5.0"
+    SWIFT_VERSION: "5.9"
     DEVELOPMENT_TEAM: ""
     CODE_SIGN_STYLE: Automatic
+  configs:
+    Debug:
+      ENABLE_TESTABILITY: YES
+    Release:
+      ENABLE_TESTABILITY: NO
 targets:
   SWARM:
     type: application
@@ -25,13 +30,15 @@ targets:
         PRODUCT_NAME: SWARM
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
-        ENABLE_TESTABILITY: YES
+        TARGETED_DEVICE_FAMILY: "1"
     info:
       path: SWARM/Resources/Info.generated.plist
       properties:
         CFBundleDisplayName: SWARM
         CFBundleShortVersionString: "$(MARKETING_VERSION)"
         CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
+        ITSAppUsesNonExemptEncryption: false
+        LSApplicationCategoryType: public.app-category.games
         UILaunchScreen: {}
         UIStatusBarHidden: true
         UIRequiresFullScreen: true
@@ -48,7 +55,7 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: ai.swarm.game.tests
         GENERATE_INFOPLIST_FILE: YES
-        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/SWARM.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/SWARM"
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/SWARM.app/SWARM"
 schemes:
   SWARM:
     build:

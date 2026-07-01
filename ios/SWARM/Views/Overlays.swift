@@ -45,6 +45,7 @@ struct MenuOverlay: View {
                             .foregroundColor(SwarmTheme.foam.opacity(0.7))
                             .padding(12)
                     }
+                    .accessibilityLabel("Settings")
                 }
                 .padding(.horizontal, 12)
                 .padding(.top, 8)
@@ -74,9 +75,11 @@ struct MenuOverlay: View {
                     }
                     Button("Play") { model.start() }.buttonStyle(NeonButton())
                     Button("Upgrades") { model.openMeta() }.buttonStyle(NeonButton(tint: Color(white: 0.22)))
-                    Text("Drag to move · weapons fire on their own · grab the green to level up")
-                        .font(SwarmTheme.ui(12)).foregroundColor(SwarmTheme.foam.opacity(0.5))
-                        .multilineTextAlignment(.center)
+                    if seenHint {
+                        Text("Drag to move · weapons fire on their own · grab the green to level up")
+                            .font(SwarmTheme.ui(12)).foregroundColor(SwarmTheme.foam.opacity(0.5))
+                            .multilineTextAlignment(.center)
+                    }
                 }
                 .padding(.horizontal, 36).padding(.bottom, 48)
             }
@@ -164,6 +167,16 @@ struct GameOverOverlay: View {
     @ObservedObject var model: GameModel
     @State private var shareImage: UIImage?
     @State private var showShare = false
+    @State private var shareFailed = false
+
+    private var sharePayload: DeathSharePayload {
+        DeathSharePayload(
+            timeSec: model.timeSec,
+            kills: model.kills,
+            level: model.level,
+            bestTime: model.bestTime
+        )
+    }
 
     var body: some View {
         ZStack {
@@ -191,22 +204,28 @@ struct GameOverOverlay: View {
                 }.padding(.horizontal, 36).padding(.bottom, 48)
             }
         }
-        .sheet(isPresented: $showShare) {
+        .onAppear { cacheShareImage() }
+        .sheet(isPresented: $showShare, onDismiss: { shareImage = nil }) {
             if let shareImage {
                 ActivityShareSheet(items: [shareImage, "Outlast the horde — SWARM"])
             }
         }
+        .alert("Couldn't create share image", isPresented: $shareFailed) {
+            Button("OK", role: .cancel) {}
+        }
+    }
+
+    private func cacheShareImage() {
+        shareImage = ShareCardRenderer.image(for: sharePayload)
     }
 
     private func presentShare() {
-        let payload = DeathSharePayload(
-            timeSec: model.timeSec,
-            kills: model.kills,
-            level: model.level,
-            bestTime: model.bestTime
-        )
-        shareImage = ShareCardRenderer.image(for: payload)
-        showShare = shareImage != nil
+        if shareImage == nil { cacheShareImage() }
+        if shareImage != nil {
+            showShare = true
+        } else {
+            shareFailed = true
+        }
     }
     private func stat(_ v: String, _ l: String) -> some View {
         VStack(spacing: 2) {

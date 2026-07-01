@@ -60,9 +60,13 @@ final class MetaStore: ObservableObject {
         return true
     }
 
+    static func coresForRun(kills: Int, timeSec: Int) -> Int {
+        kills + max(1, timeSec / 12)
+    }
+
     @discardableResult
     func awardRun(kills: Int, timeSec: Int) -> Bool {
-        let earned = kills + max(1, timeSec / 12)
+        let earned = Self.coresForRun(kills: kills, timeSec: timeSec)
         cores += earned
         let newBest = timeSec > bestTime
         if newBest { bestTime = timeSec }

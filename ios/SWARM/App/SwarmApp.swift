@@ -8,10 +8,6 @@ import SpriteKit
 struct SwarmApp: App {
     @StateObject private var host = GameHost()
 
-    init() {
-        GameCenterManager.shared.authenticate()
-    }
-
     var body: some Scene {
         WindowGroup {
             GameRootView(host: host)
@@ -56,5 +52,8 @@ struct GameRootView: View {
         }
         .background(SwarmTheme.bg)
         .preferredColorScheme(.dark)
+        .onAppear {
+            GameCenterManager.shared.authenticate()
+        }
     }
 }

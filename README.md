@@ -47,6 +47,7 @@ xcodebuild -project SWARM.xcodeproj -scheme SWARM -sdk iphonesimulator \
 Unit tests:
 ```bash
 cd ios
+xcodegen generate
 xcodebuild test -project SWARM.xcodeproj -scheme SWARM -sdk iphonesimulator \
   -destination 'platform=iOS Simulator,name=iPhone 17' CODE_SIGNING_ALLOWED=NO
 ```
@@ -54,12 +55,21 @@ xcodebuild test -project SWARM.xcodeproj -scheme SWARM -sdk iphonesimulator \
 ## TestFlight
 Beta tester instructions: **[TESTING.md](TESTING.md)**
 
+### App Store Connect checklist (first upload)
+1. **Developer portal** — Register App ID `ai.swarm.game` with **Game Center** capability enabled.
+2. **App Store Connect** — Create app record (bundle ID `ai.swarm.game`, Games category).
+3. **Leaderboard** — Create `ai.swarm.game.besttime`: integer score, sort **high-to-low** (survival seconds).
+4. **Build number** — Increment `CURRENT_PROJECT_VERSION` in `ios/project.yml` before each upload (ASC rejects duplicate builds).
+5. **Privacy** — App Privacy questionnaire: no tracking; local game progress; Game Center gameplay data for leaderboard.
+6. **Export compliance** — App uses only standard Apple APIs (`ITSAppUsesNonExemptEncryption: false` in Info.plist).
+7. **Beta review** — External TestFlight needs Beta App Review; note that Game Center sign-in is optional (offline play works).
+
 Build an App Store IPA for upload:
 ```bash
 chmod +x scripts/build-testflight.sh   # one-time
 DEVELOPMENT_TEAM=YOUR_TEAM_ID ./scripts/build-testflight.sh
 ```
-Requires a valid Apple Developer account and automatic signing with the Game Center capability enabled for `ai.swarm.game`.
+Requires Xcode with your Apple ID signed in (Settings → Accounts) and automatic signing. Upload the IPA with **Transporter** (recommended) or `xcrun iTMSTransporter`.
 
 ## Layout
 ```

@@ -352,6 +352,10 @@ final class GameScene: SKScene {
         updateOrbit(dt)
         updateGems(dt)
 
+        if model?.phase == .levelUp {
+            publishHUD()
+            return
+        }
         if hp <= 0 { die() ; return }
         publishHUD()
         if Int(runTime) != model?.timeSec { model?.timeSec = Int(runTime) }
@@ -607,19 +611,21 @@ final class GameScene: SKScene {
             b.position = CGPoint(x: bx, y: by); b.zRotation = a
             for e in enemies {
                 let dx = e.node.position.x - bx, dy = e.node.position.y - by
-                if dx*dx + dy*dy < (e.radius + 10) * (e.radius + 10) { damage(e, dmg * dmgMult * dt * 6) }
+                if dx*dx + dy*dy < (e.radius + 10) * (e.radius + 10) {
+                    damage(e, dmg * dmgMult * dt * 6, showFloater: false)
+                }
             }
         }
     }
 
     // MARK: - Damage / death / xp
 
-    private func damage(_ e: Enemy, _ amount: CGFloat) {
+    private func damage(_ e: Enemy, _ amount: CGFloat, showFloater: Bool = true) {
         let dealt = max(1, Int(amount))
         e.hp -= amount
         e.flash = 0.07
         e.node.color = .white; e.node.colorBlendFactor = 0.9
-        showDamage(at: e.node.position, amount: dealt, boss: e.kind == 9)
+        if showFloater { showDamage(at: e.node.position, amount: dealt, boss: e.kind == 9) }
         if Int(runTime * 60) % 3 == 0 { SfxPlayer.shared.hit() }
         if e.hp <= 0 { kill(e) }
     }
@@ -661,6 +667,7 @@ final class GameScene: SKScene {
     }
     private func updateGems(_ dt: CGFloat) {
         for g in gems {
+            guard model?.phase == .playing else { break }
             let dx = pPos.x - g.node.position.x, dy = pPos.y - g.node.position.y
             let d = (dx*dx + dy*dy).squareRoot()
             if d < pickupRadius {
@@ -673,6 +680,7 @@ final class GameScene: SKScene {
         gems.removeAll { $0.node.parent == nil }
     }
     private func gainXP(_ v: CGFloat) {
+        guard model?.phase == .playing else { return }
         xp += v
         if xp >= xpToNext {
             xp -= xpToNext; level += 1
@@ -691,12 +699,11 @@ final class GameScene: SKScene {
     }
 
     private func die() {
-        let t = Int(runTime)
+        let t = Int(runTime.rounded())
         model?.timeSec = t
         model?.kills = kills
         model?.level = level
-        let earned = kills + max(1, t / 12)
-        model?.coresEarned = earned
+        model?.coresEarned = MetaStore.coresForRun(kills: kills, timeSec: t)
         if model?.meta.awardRun(kills: kills, timeSec: t) == true {
             GameCenterManager.shared.submitBestTime(t)
         }

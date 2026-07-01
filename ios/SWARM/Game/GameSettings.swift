@@ -3,23 +3,28 @@
 import Foundation
 
 enum GameSettings {
-    private static let ud = UserDefaults.standard
-    private static let soundKey = "swarm_sound_on"
-    private static let hapticsKey = "swarm_haptics_on"
+    static let soundKey = "swarm_sound_on"
+    static let hapticsKey = "swarm_haptics_on"
+
+    private static var storage: UserDefaults = .standard
+
+    static func configure(defaults: UserDefaults = .standard) {
+        storage = defaults
+    }
 
     static var soundEnabled: Bool {
         get {
-            if ud.object(forKey: soundKey) == nil { return true }
-            return ud.bool(forKey: soundKey)
+            if storage.object(forKey: soundKey) == nil { return true }
+            return storage.bool(forKey: soundKey)
         }
-        set { ud.set(newValue, forKey: soundKey) }
+        set { storage.set(newValue, forKey: soundKey) }
     }
 
     static var hapticsEnabled: Bool {
         get {
-            if ud.object(forKey: hapticsKey) == nil { return true }
-            return ud.bool(forKey: hapticsKey)
+            if storage.object(forKey: hapticsKey) == nil { return true }
+            return storage.bool(forKey: hapticsKey)
         }
-        set { ud.set(newValue, forKey: hapticsKey) }
+        set { storage.set(newValue, forKey: hapticsKey) }
     }
 }

@@ -2,6 +2,7 @@
 // SwiftUI renders menu / level-up / game-over overlays; the scene drives everything else.
 // Mutated only on the main thread (scene update + SwiftUI actions both run on main).
 
+import Combine
 import Foundation
 
 struct UpgradeCard: Identifiable {
@@ -31,9 +32,16 @@ final class GameModel: ObservableObject {
     @Published var coresEarned: Int = 0
 
     let meta = MetaStore()
+    private var cancellables = Set<AnyCancellable>()
 
     var bestTime: Int { meta.bestTime }
     var cores: Int { meta.cores }
+
+    init() {
+        meta.objectWillChange
+            .sink { [weak self] _ in self?.objectWillChange.send() }
+            .store(in: &cancellables)
+    }
 
     // Wired by the scene
     var onStart: () -> Void = {}
@@ -45,7 +53,7 @@ final class GameModel: ObservableObject {
     func restart() { onRestart() }
     func openMeta() { phase = .meta }
     func closeMeta() { phase = .menu }
-    func openSettings() { phase = .settings }
+    func openSettings() { guard phase == .menu else { return }; phase = .settings }
     func closeSettings() { phase = .menu }
     func buyMeta(_ id: String) {
         guard let up = MetaCatalog.all.first(where: { $0.id == id }) else { return }

@@ -4,12 +4,17 @@
 import GameKit
 import UIKit
 
+@MainActor
 final class GameCenterManager: NSObject, ObservableObject {
     static let shared = GameCenterManager()
     static let leaderboardID = "ai.swarm.game.besttime"
 
     @Published private(set) var statusLine: String = ""
     @Published private(set) var isAvailable: Bool = false
+
+    private var pendingBestTime: Int?
+    private var authHandlerInstalled = false
+    private weak var pendingAuthVC: UIViewController?
 
     private override init() {
         super.init()
@@ -25,23 +30,34 @@ final class GameCenterManager: NSObject, ObservableObject {
         #if targetEnvironment(simulator)
         return
         #else
+        guard !authHandlerInstalled else {
+            retryPresentAuthIfNeeded()
+            return
+        }
+        authHandlerInstalled = true
         let player = GKLocalPlayer.local
         player.authenticateHandler = { [weak self] viewController, error in
-            guard let self else { return }
-            if let vc = viewController {
-                self.presentAuth(vc)
-                return
-            }
-            if player.isAuthenticated {
-                self.isAvailable = true
-                self.statusLine = "Signed in to Game Center"
-            } else {
-                self.isAvailable = false
-                if let error {
-                    self.statusLine = "Game Center unavailable"
-                    NSLog("Game Center auth error: %@", error.localizedDescription)
+            Task { @MainActor in
+                guard let self else { return }
+                if let vc = viewController {
+                    self.pendingAuthVC = vc
+                    self.statusLine = "Sign in to Game Center"
+                    self.presentAuth(vc)
+                    return
+                }
+                self.pendingAuthVC = nil
+                if player.isAuthenticated {
+                    self.isAvailable = true
+                    self.statusLine = "Signed in to Game Center"
+                    self.flushPendingSubmit()
                 } else {
-                    self.statusLine = "Game Center unavailable"
+                    self.isAvailable = false
+                    if let error {
+                        self.statusLine = "Game Center unavailable"
+                        NSLog("Game Center auth error: %@", error.localizedDescription)
+                    } else {
+                        self.statusLine = "Game Center unavailable"
+                    }
                 }
             }
         }
@@ -49,29 +65,58 @@ final class GameCenterManager: NSObject, ObservableObject {
     }
 
     func submitBestTime(_ seconds: Int) {
-        guard seconds > 0, isAvailable, GKLocalPlayer.local.isAuthenticated else { return }
+        guard seconds > 0 else { return }
+        #if targetEnvironment(simulator)
+        return
+        #else
+        if isAvailable, GKLocalPlayer.local.isAuthenticated {
+            submitNow(seconds)
+        } else {
+            pendingBestTime = max(pendingBestTime ?? 0, seconds)
+        }
+        #endif
+    }
+
+    func retryPresentAuthIfNeeded() {
+        guard let vc = pendingAuthVC else { return }
+        presentAuth(vc)
+    }
+
+    private func flushPendingSubmit() {
+        guard let pending = pendingBestTime else { return }
+        pendingBestTime = nil
+        submitNow(pending)
+    }
+
+    private func submitNow(_ seconds: Int) {
         GKLeaderboard.submitScore(
             seconds,
             context: 0,
             player: GKLocalPlayer.local,
             leaderboardIDs: [Self.leaderboardID]
-        ) { error in
-            if let error {
-                NSLog("Leaderboard submit failed: %@", error.localizedDescription)
+        ) { [weak self] error in
+            Task { @MainActor in
+                guard let self else { return }
+                if let error {
+                    NSLog("Leaderboard submit failed: %@", error.localizedDescription)
+                    self.statusLine = "Leaderboard sync failed"
+                }
             }
         }
     }
 
     private func presentAuth(_ vc: UIViewController) {
-        DispatchQueue.main.async {
-            guard let root = UIApplication.shared.connectedScenes
-                .compactMap({ $0 as? UIWindowScene })
-                .flatMap(\.windows)
-                .first(where: { $0.isKeyWindow })?
-                .rootViewController else { return }
-            var top = root
-            while let presented = top.presentedViewController { top = presented }
-            top.present(vc, animated: true)
+        guard let root = UIApplication.shared.connectedScenes
+            .compactMap({ $0 as? UIWindowScene })
+            .flatMap(\.windows)
+            .first(where: { $0.isKeyWindow })?
+            .rootViewController else {
+            statusLine = "Sign in to Game Center"
+            return
         }
+        var top = root
+        while let presented = top.presentedViewController { top = presented }
+        guard top.presentedViewController !== vc else { return }
+        top.present(vc, animated: true)
     }
 }
