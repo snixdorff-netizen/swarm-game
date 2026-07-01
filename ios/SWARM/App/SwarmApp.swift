@@ -44,6 +44,7 @@ struct GameRootView: View {
             case .menu: MenuOverlay(model: model)
             case .levelUp: LevelUpOverlay(model: model)
             case .dead: GameOverOverlay(model: model)
+            case .meta: MetaOverlay(model: model)
             case .playing: EmptyView()
             }
         }

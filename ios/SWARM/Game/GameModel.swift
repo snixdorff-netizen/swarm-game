@@ -13,7 +13,7 @@ struct UpgradeCard: Identifiable {
 }
 
 final class GameModel: ObservableObject {
-    enum Phase { case menu, playing, levelUp, dead }
+    enum Phase { case menu, playing, levelUp, dead, meta }
 
     @Published var phase: Phase = .menu
     @Published var choices: [UpgradeCard] = []
@@ -28,7 +28,12 @@ final class GameModel: ObservableObject {
     @Published var kills: Int = 0
 
     // End-of-run snapshot
-    @Published var bestTime: Int = 0
+    @Published var coresEarned: Int = 0
+
+    let meta = MetaStore()
+
+    var bestTime: Int { meta.bestTime }
+    var cores: Int { meta.cores }
 
     // Wired by the scene
     var onStart: () -> Void = {}
@@ -38,4 +43,10 @@ final class GameModel: ObservableObject {
     func start() { onStart() }
     func pick(_ id: String) { onChoose(id) }
     func restart() { onRestart() }
+    func openMeta() { phase = .meta }
+    func closeMeta() { phase = .menu }
+    func buyMeta(_ id: String) {
+        guard let up = MetaCatalog.all.first(where: { $0.id == id }) else { return }
+        meta.buy(up)
+    }
 }

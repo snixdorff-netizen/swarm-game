@@ -17,10 +17,21 @@ private final class Enemy {
     var radius: CGFloat
     var dmg: CGFloat
     var xp: CGFloat
+    var kind: Int          // 0 basic, 1 fast, 2 tank, 3 shooter, 9 boss
     var flash: CGFloat = 0
-    init(node: SKSpriteNode, hp: CGFloat, speed: CGFloat, radius: CGFloat, dmg: CGFloat, xp: CGFloat) {
+    var shootTimer: CGFloat = 0
+    init(node: SKSpriteNode, hp: CGFloat, speed: CGFloat, radius: CGFloat, dmg: CGFloat, xp: CGFloat, kind: Int = 0) {
         self.node = node; self.hp = hp; self.maxHp = hp; self.speed = speed
-        self.radius = radius; self.dmg = dmg; self.xp = xp
+        self.radius = radius; self.dmg = dmg; self.xp = xp; self.kind = kind
+    }
+}
+private final class EnemyShot {
+    let node: SKSpriteNode
+    var vel: CGVector
+    var dmg: CGFloat
+    var life: CGFloat
+    init(node: SKSpriteNode, vel: CGVector, dmg: CGFloat, life: CGFloat) {
+        self.node = node; self.vel = vel; self.dmg = dmg; self.life = life
     }
 }
 private final class Projectile {
@@ -49,7 +60,10 @@ private enum C {
     static let basic = SKColor(red: 1.0, green: 0.30, blue: 0.42, alpha: 1)
     static let fast = SKColor(red: 1.0, green: 0.66, blue: 0.30, alpha: 1)
     static let tank = SKColor(red: 0.69, green: 0.42, blue: 1.0, alpha: 1)
+    static let shooter = SKColor(red: 1.0, green: 0.45, blue: 0.75, alpha: 1)
+    static let boss = SKColor(red: 0.95, green: 0.15, blue: 0.55, alpha: 1)
     static let gem = SKColor(red: 0.71, green: 1.0, blue: 0.36, alpha: 1)
+    static let chain = SKColor(red: 0.55, green: 0.75, blue: 1.0, alpha: 1)
     static let orbit = SKColor(red: 0.20, green: 0.88, blue: 1.0, alpha: 1)
 }
 
@@ -85,11 +99,19 @@ final class GameScene: SKScene {
     private var novaInterval: CGFloat = 1.6
     private var novaTimer: CGFloat = 0
     private var novaRing = SKShapeNode()
+    private var chainLevel: Int = 0
+    private var chainDmg: CGFloat = 14
+    private var chainInterval: CGFloat = 1.4
+    private var chainTimer: CGFloat = 0
+    private var dmgMult: CGFloat = 1
 
     // World
     private var enemies: [Enemy] = []
     private var projectiles: [Projectile] = []
+    private var enemyShots: [EnemyShot] = []
     private var gems: [Gem] = []
+    private var bossSpawned = false
+    private var bossWarnLabel = SKLabelNode()
     private let cam = SKCameraNode()
     private var gridNode = SKNode()
 
@@ -130,6 +152,7 @@ final class GameScene: SKScene {
         buildPlayer()
         buildHUD()
         buildStick()
+        buildBossWarn()
         cam.position = pPos
         setChrome(false)
         if ProcessInfo.processInfo.environment["SWARM_AUTOSTART"] != nil {
@@ -212,6 +235,14 @@ final class GameScene: SKScene {
         place(xpBarBg, xpBar, y: top - 114, frac: xpToNext > 0 ? xp/xpToNext : 0, height: 5)
     }
 
+    private func buildBossWarn() {
+        bossWarnLabel = label(28, weight: .heavy)
+        bossWarnLabel.fontColor = C.boss
+        bossWarnLabel.isHidden = true
+        bossWarnLabel.zPosition = 55
+        cam.addChild(bossWarnLabel)
+    }
+
     private func buildStick() {
         stickBase = SKShapeNode(circleOfRadius: 52)
         stickBase.strokeColor = SKColor(white: 1, alpha: 0.18); stickBase.lineWidth = 3; stickBase.fillColor = SKColor(white: 1, alpha: 0.04)
@@ -227,11 +258,18 @@ final class GameScene: SKScene {
     func startRun() {
         enemies.forEach { $0.node.removeFromParent() }; enemies.removeAll()
         projectiles.forEach { $0.node.removeFromParent() }; projectiles.removeAll()
+        enemyShots.forEach { $0.node.removeFromParent() }; enemyShots.removeAll()
         gems.forEach { $0.node.removeFromParent() }; gems.removeAll()
         orbitNodes.forEach { $0.removeFromParent() }; orbitNodes.removeAll()
-        hp = 100; maxHp = 100; moveSpeed = 178; pickupRadius = 78; regen = 0
+        bossSpawned = false; bossWarnLabel.isHidden = true
+        let meta = model?.meta
+        dmgMult = meta?.damageMult ?? 1
+        hp = 100 + (meta?.bonusHp ?? 0); maxHp = hp
+        moveSpeed = 178 * (meta?.speedMult ?? 1)
+        pickupRadius = 78 + (meta?.bonusMagnet ?? 0); regen = 0
         boltDmg = 12; boltInterval = 0.72; boltTimer = 0; boltCount = 1; boltPierce = 0
         orbitLevel = 0; orbitDmg = 10; novaLevel = 0; novaDmg = 16; novaRadius = 110; novaInterval = 1.6
+        chainLevel = 0; chainDmg = 14; chainInterval = 1.4; chainTimer = 0
         novaRing.path = CGPath(ellipseIn: CGRect(x: -novaRadius, y: -novaRadius, width: novaRadius*2, height: novaRadius*2), transform: nil)
         level = 1; xp = 0; xpToNext = 6; runTime = 0; kills = 0; spawnTimer = 0
         pPos = .zero; player.position = .zero; player.zRotation = 0
@@ -261,6 +299,8 @@ final class GameScene: SKScene {
         case "move": moveSpeed += 22
         case "pickup": pickupRadius += 36
         case "regen": regen += 1.4
+        case "chain": if chainLevel == 0 { chainLevel = 1 } else { chainLevel += 1 }; chainInterval = max(0.5, chainInterval * 0.88)
+        case "chain_dmg": chainDmg += 9
         default: break
         }
         model?.phase = .playing
@@ -304,9 +344,11 @@ final class GameScene: SKScene {
 
         updateAim()
         spawn(dt)
+        maybeBoss()
         updateEnemies(dt)
         fireWeapons(dt)
         updateProjectiles(dt)
+        updateEnemyShots(dt)
         updateOrbit(dt)
         updateGems(dt)
 
@@ -352,30 +394,102 @@ final class GameScene: SKScene {
         let t = runTime
         var kind = 0
         let roll = CGFloat.random(in: 0..<1)
-        if t > 60 && roll < 0.16 { kind = 2 } else if t > 28 && roll < 0.42 { kind = 1 }
+        if t > 60 && roll < 0.16 { kind = 2 }
+        else if t > 45 && roll < 0.28 { kind = 3 }
+        else if t > 28 && roll < 0.42 { kind = 1 }
         let scale = 1 + t * 0.012
         var color = C.basic, hpv: CGFloat = 18, spd: CGFloat = 52, rad: CGFloat = 12, dmg: CGFloat = 8, xpv: CGFloat = 1, sz: CGFloat = 22
         if kind == 1 { color = C.fast; hpv = 12; spd = 96; rad = 9; dmg = 7; xpv = 1; sz = 16 }
         if kind == 2 { color = C.tank; hpv = 70; spd = 34; rad = 19; dmg = 16; xpv = 3; sz = 36 }
+        if kind == 3 { color = C.shooter; hpv = 22; spd = 38; rad = 11; dmg = 5; xpv = 2; sz = 18 }
         hpv *= scale; dmg *= (1 + t * 0.004)
         let node = SKSpriteNode(color: color, size: CGSize(width: sz, height: sz))
         node.position = pos; node.zRotation = .pi/4; node.zPosition = 2
+        if kind == 3 { node.zRotation = 0 }
         addChild(node)
-        enemies.append(Enemy(node: node, hp: hpv, speed: spd, radius: rad, dmg: dmg, xp: xpv))
+        enemies.append(Enemy(node: node, hp: hpv, speed: spd, radius: rad, dmg: dmg, xp: xpv, kind: kind))
+    }
+
+    private func maybeBoss() {
+        guard !bossSpawned, runTime >= 90 else { return }
+        bossSpawned = true
+        spawnBoss()
+    }
+
+    private func spawnBoss() {
+        SfxPlayer.shared.boss(); Haptics.shared.boss()
+        bossWarnLabel.text = "⚠ BOSS INCOMING"
+        bossWarnLabel.isHidden = false
+        bossWarnLabel.run(.sequence([.wait(forDuration: 2.2), .fadeOut(withDuration: 0.4), .run { [weak self] in self?.bossWarnLabel.isHidden = true; self?.bossWarnLabel.alpha = 1 }]))
+        let ang = CGFloat.random(in: 0..<(2 * .pi))
+        let dist = max(size.width, size.height) * 0.5
+        let pos = CGPoint(x: pPos.x + cos(ang) * dist, y: pPos.y + sin(ang) * dist)
+        let scale = 1 + runTime * 0.012
+        let hpv: CGFloat = 420 * scale
+        let node = SKSpriteNode(color: C.boss, size: CGSize(width: 64, height: 64))
+        node.position = pos; node.zRotation = .pi/4; node.zPosition = 6
+        addChild(node)
+        enemies.append(Enemy(node: node, hp: hpv, speed: 28, radius: 30, dmg: 28, xp: 18, kind: 9))
     }
 
     private func updateEnemies(_ dt: CGFloat) {
         for e in enemies {
             let dx = pPos.x - e.node.position.x, dy = pPos.y - e.node.position.y
             let d = max(1, (dx*dx + dy*dy).squareRoot())
-            e.node.position.x += dx/d * e.speed * dt
-            e.node.position.y += dy/d * e.speed * dt
+            if e.kind == 3 {
+                let keep = e.radius + 140
+                if d < keep { e.node.position.x -= dx/d * e.speed * dt; e.node.position.y -= dy/d * e.speed * dt }
+                else { e.node.position.x += dx/d * e.speed * 0.6 * dt; e.node.position.y += dy/d * e.speed * 0.6 * dt }
+                e.shootTimer -= dt
+                if e.shootTimer <= 0 {
+                    e.shootTimer = 1.35
+                    fireEnemyShot(from: e.node.position, dmg: e.dmg * 0.75)
+                }
+            } else if e.kind == 9 {
+                e.node.position.x += dx/d * e.speed * dt
+                e.node.position.y += dy/d * e.speed * dt
+                e.shootTimer -= dt
+                if e.shootTimer <= 0 {
+                    e.shootTimer = 0.9
+                    for i in -1...1 { fireEnemyShot(from: e.node.position, dmg: e.dmg * 0.35, spread: CGFloat(i) * 0.22) }
+                }
+            } else {
+                e.node.position.x += dx/d * e.speed * dt
+                e.node.position.y += dy/d * e.speed * dt
+            }
             if e.flash > 0 { e.flash -= dt; if e.flash <= 0 { e.node.colorBlendFactor = 0 } }
-            // contact damage
             if d < e.radius + 13 && hurtCooldown <= 0 {
-                if !autoDrive { hp -= e.dmg; flashHurt() }   // autoDrive (capture only) = damage-immune
+                if !autoDrive { hp -= e.dmg; flashHurt() }
                 hurtCooldown = 0.55
             }
+        }
+    }
+
+    private func fireEnemyShot(from pos: CGPoint, dmg: CGFloat, spread: CGFloat = 0) {
+        let dx = pPos.x - pos.x, dy = pPos.y - pos.y
+        let ang = atan2(dy, dx) + spread
+        let speed: CGFloat = 210
+        let node = SKSpriteNode(color: C.shooter, size: CGSize(width: 10, height: 10))
+        node.position = pos; node.zPosition = 3
+        addChild(node)
+        enemyShots.append(EnemyShot(node: node, vel: CGVector(dx: cos(ang)*speed, dy: sin(ang)*speed), dmg: dmg, life: 2.8))
+    }
+
+    private func updateEnemyShots(_ dt: CGFloat) {
+        for s in enemyShots {
+            s.node.position.x += s.vel.dx * dt
+            s.node.position.y += s.vel.dy * dt
+            s.life -= dt
+            let dx = pPos.x - s.node.position.x, dy = pPos.y - s.node.position.y
+            if dx*dx + dy*dy < 18*18 && hurtCooldown <= 0 {
+                if !autoDrive { hp -= s.dmg; flashHurt() }
+                hurtCooldown = 0.45
+                s.life = 0
+            }
+        }
+        enemyShots.removeAll { s in
+            if s.life <= 0 { s.node.removeFromParent(); return true }
+            return false
         }
     }
 
@@ -393,10 +507,16 @@ final class GameScene: SKScene {
         }
         if novaLevel > 0 {
             novaTimer -= dt
-            // ring pulse visual
             if novaTimer <= 0 {
                 novaTimer = novaInterval
                 novaPulse()
+            }
+        }
+        if chainLevel > 0 {
+            chainTimer -= dt
+            if chainTimer <= 0, let first = nearestEnemy() {
+                chainTimer = chainInterval
+                chainLightning(from: first)
             }
         }
     }
@@ -405,15 +525,50 @@ final class GameScene: SKScene {
         let node = SKSpriteNode(color: C.bolt, size: CGSize(width: 14, height: 5))
         node.position = pPos; node.zRotation = angle; node.zPosition = 4
         addChild(node)
-        projectiles.append(Projectile(node: node, vel: CGVector(dx: cos(angle)*speed, dy: sin(angle)*speed), dmg: boltDmg, pierce: boltPierce, life: 1.4))
+        projectiles.append(Projectile(node: node, vel: CGVector(dx: cos(angle)*speed, dy: sin(angle)*speed), dmg: boltDmg * dmgMult, pierce: boltPierce, life: 1.4))
     }
+    private func chainLightning(from start: Enemy) {
+        SfxPlayer.shared.chain()
+        var hit: [Enemy] = [start]
+        var pool = enemies.filter { $0 !== start }
+        let jumps = 2 + chainLevel
+        var last = start.node.position
+        for _ in 0..<jumps {
+            guard let next = pool.min(by: {
+                dist($0.node.position, last) < dist($1.node.position, last)
+            }) else { break }
+            let p2 = next.node.position
+            drawChain(from: last, to: p2)
+            damage(next, chainDmg * dmgMult)
+            hit.append(next)
+            pool.removeAll { $0 === next }
+            last = p2
+        }
+        damage(start, chainDmg * dmgMult * 0.6)
+    }
+
+    private func dist(_ a: CGPoint, _ b: CGPoint) -> CGFloat {
+        let dx = a.x - b.x, dy = a.y - b.y
+        return dx*dx + dy*dy
+    }
+
+    private func drawChain(from a: CGPoint, to b: CGPoint) {
+        let path = CGMutablePath()
+        path.move(to: a); path.addLine(to: b)
+        let line = SKShapeNode(path: path)
+        line.strokeColor = C.chain; line.lineWidth = 2; line.glowWidth = 4; line.zPosition = 7
+        addChild(line)
+        line.run(.sequence([.fadeOut(withDuration: 0.12), .removeFromParent()]))
+    }
+
     private func novaPulse() {
+        SfxPlayer.shared.nova()
         let r = novaRadius
         let ring = SKShapeNode(circleOfRadius: 8)
         ring.position = pPos; ring.strokeColor = C.orbit; ring.lineWidth = 3; ring.fillColor = .clear; ring.zPosition = 3; ring.glowWidth = 2
         addChild(ring)
         ring.run(.sequence([.group([.scale(to: r/8, duration: 0.32), .fadeOut(withDuration: 0.32)]), .removeFromParent()]))
-        let dmg = novaDmg * CGFloat(novaLevel)
+        let dmg = novaDmg * CGFloat(novaLevel) * dmgMult
         for e in enemies {
             let dx = e.node.position.x - pPos.x, dy = e.node.position.y - pPos.y
             if dx*dx + dy*dy < r*r { damage(e, dmg) }
@@ -452,7 +607,7 @@ final class GameScene: SKScene {
             b.position = CGPoint(x: bx, y: by); b.zRotation = a
             for e in enemies {
                 let dx = e.node.position.x - bx, dy = e.node.position.y - by
-                if dx*dx + dy*dy < (e.radius + 10) * (e.radius + 10) { damage(e, dmg * dt * 6) }
+                if dx*dx + dy*dy < (e.radius + 10) * (e.radius + 10) { damage(e, dmg * dmgMult * dt * 6) }
             }
         }
     }
@@ -460,15 +615,33 @@ final class GameScene: SKScene {
     // MARK: - Damage / death / xp
 
     private func damage(_ e: Enemy, _ amount: CGFloat) {
+        let dealt = max(1, Int(amount))
         e.hp -= amount
         e.flash = 0.07
         e.node.color = .white; e.node.colorBlendFactor = 0.9
+        showDamage(at: e.node.position, amount: dealt, boss: e.kind == 9)
+        if Int(runTime * 60) % 3 == 0 { SfxPlayer.shared.hit() }
         if e.hp <= 0 { kill(e) }
+    }
+
+    private func showDamage(at p: CGPoint, amount: Int, boss: Bool = false) {
+        let n = SKLabelNode(text: "\(amount)")
+        n.fontName = "AvenirNextCondensed-Heavy"
+        n.fontSize = boss ? 18 : 13
+        n.fontColor = boss ? C.boss : .white
+        n.position = CGPoint(x: p.x + CGFloat.random(in: -6...6), y: p.y + 10)
+        n.zPosition = 20
+        addChild(n)
+        n.run(.sequence([
+            .group([.moveBy(x: 0, y: 28, duration: 0.45), .fadeOut(withDuration: 0.45)]),
+            .removeFromParent()
+        ]))
     }
     private func kill(_ e: Enemy) {
         e.node.removeFromParent()
         if let idx = enemies.firstIndex(where: { $0 === e }) { enemies.remove(at: idx) }
         kills += 1; model?.kills = kills
+        SfxPlayer.shared.kill(); Haptics.shared.kill()
         burst(at: e.node.position, color: e.node.color)
         dropGem(at: e.node.position, value: e.xp)
     }
@@ -495,7 +668,7 @@ final class GameScene: SKScene {
                 g.node.position.x += dx/max(1,d) * pull * dt
                 g.node.position.y += dy/max(1,d) * pull * dt
             }
-            if d < 16 { gainXP(g.value); g.node.removeFromParent() }
+            if d < 16 { gainXP(g.value); SfxPlayer.shared.pickup(); g.node.removeFromParent() }
         }
         gems.removeAll { $0.node.parent == nil }
     }
@@ -510,6 +683,7 @@ final class GameScene: SKScene {
     }
 
     private func flashHurt() {
+        SfxPlayer.shared.hurt(); Haptics.shared.hurt()
         let f = SKSpriteNode(color: SKColor(red: 1, green: 0.1, blue: 0.2, alpha: 0.34), size: size)
         f.zPosition = 70; f.position = .zero; cam.addChild(f)
         f.run(.sequence([.fadeOut(withDuration: 0.35), .removeFromParent()]))
@@ -517,10 +691,14 @@ final class GameScene: SKScene {
     }
 
     private func die() {
-        model?.timeSec = Int(runTime)
+        let t = Int(runTime)
+        model?.timeSec = t
         model?.kills = kills
         model?.level = level
-        if Int(runTime) > (model?.bestTime ?? 0) { model?.bestTime = Int(runTime) }
+        let earned = kills + max(1, t / 12)
+        model?.coresEarned = earned
+        model?.meta.awardRun(kills: kills, timeSec: t)
+        SfxPlayer.shared.death(); Haptics.shared.death()
         model?.phase = .dead
         sticking = false; moveDir = .zero; stickBase.isHidden = true; stickKnob.isHidden = true
     }
@@ -531,6 +709,7 @@ final class GameScene: SKScene {
         let choices = pickChoices()
         model?.choices = choices
         sticking = false; moveDir = .zero; stickBase.isHidden = true; stickKnob.isHidden = true
+        SfxPlayer.shared.levelUp(); Haptics.shared.levelUp()
         model?.phase = .levelUp
         if autoDrive, let first = choices.first {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in self?.applyUpgrade(first.id) }
@@ -550,6 +729,8 @@ final class GameScene: SKScene {
         pool.append(UpgradeCard(id: "move", title: "Swift Feet", subtitle: "+move speed", symbol: "figure.run", levelText: ""))
         pool.append(UpgradeCard(id: "pickup", title: "Magnet", subtitle: "+pickup range", symbol: "scope", levelText: ""))
         if regen < 6 { pool.append(UpgradeCard(id: "regen", title: "Regeneration", subtitle: "Heal over time", symbol: "cross.case.fill", levelText: "")) }
+        pool.append(UpgradeCard(id: chainLevel == 0 ? "chain" : "chain", title: chainLevel == 0 ? "Chain Lightning" : "Faster Arc", subtitle: chainLevel == 0 ? "Zap chains between foes" : "Arc more often", symbol: "bolt.horizontal.fill", levelText: chainLevel == 0 ? "NEW" : "Lv \(chainLevel+1)"))
+        if chainLevel > 0 { pool.append(UpgradeCard(id: "chain_dmg", title: "High Voltage", subtitle: "+chain damage", symbol: "bolt.circle.fill", levelText: "")) }
         pool.shuffle()
         return Array(pool.prefix(3))
     }

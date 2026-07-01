@@ -41,13 +41,18 @@ struct MenuOverlay: View {
                     .shadow(color: SwarmTheme.cyan.opacity(0.7), radius: 18)
                 Text("Outlast the horde.")
                     .font(SwarmTheme.ui(18)).foregroundColor(SwarmTheme.foam.opacity(0.8))
-                if model.bestTime > 0 {
-                    Text("Best: \(timeStr(model.bestTime))")
-                        .font(SwarmTheme.ui(14)).foregroundColor(SwarmTheme.lime).padding(.top, 4)
-                }
+                HStack(spacing: 16) {
+                    if model.bestTime > 0 {
+                        Text("Best: \(timeStr(model.bestTime))")
+                            .font(SwarmTheme.ui(14)).foregroundColor(SwarmTheme.lime)
+                    }
+                    Text("\(model.cores) cores")
+                        .font(SwarmTheme.ui(14, .bold)).foregroundColor(SwarmTheme.cyan)
+                }.padding(.top, 4)
                 Spacer()
                 VStack(spacing: 14) {
                     Button("Play") { model.start() }.buttonStyle(NeonButton())
+                    Button("Upgrades") { model.openMeta() }.buttonStyle(NeonButton(tint: Color(white: 0.22)))
                     Text("Drag to move · weapons fire on their own · grab the green to level up")
                         .font(SwarmTheme.ui(12)).foregroundColor(SwarmTheme.foam.opacity(0.5))
                         .multilineTextAlignment(.center)
@@ -125,6 +130,10 @@ struct GameOverOverlay: View {
                     stat("LV \(model.level)", "reached")
                     stat(timeStr(model.bestTime), "best")
                 }.padding(.top, 14)
+                if model.coresEarned > 0 {
+                    Text("+\(model.coresEarned) cores")
+                        .font(SwarmTheme.ui(16, .bold)).foregroundColor(SwarmTheme.cyan).padding(.top, 6)
+                }
                 Spacer()
                 VStack(spacing: 12) {
                     Button("Run again") { model.start() }.buttonStyle(NeonButton(tint: SwarmTheme.cyan))
@@ -138,6 +147,87 @@ struct GameOverOverlay: View {
             Text(v).font(SwarmTheme.ui(22, .bold)).foregroundColor(SwarmTheme.lime)
             Text(l).font(SwarmTheme.ui(12)).foregroundColor(SwarmTheme.foam.opacity(0.6))
         }
+    }
+}
+
+struct MetaOverlay: View {
+    @ObservedObject var model: GameModel
+    @ObservedObject private var meta: MetaStore
+
+    init(model: GameModel) {
+        self.model = model
+        _meta = ObservedObject(wrappedValue: model.meta)
+    }
+
+    var body: some View {
+        ZStack {
+            SwarmTheme.bg.opacity(0.94).ignoresSafeArea()
+            VStack(spacing: 12) {
+                HStack {
+                    Text("UPGRADES")
+                        .font(SwarmTheme.title(32)).foregroundColor(SwarmTheme.cyan)
+                    Spacer()
+                    Text("\(meta.cores) cores")
+                        .font(SwarmTheme.ui(16, .bold)).foregroundColor(SwarmTheme.lime)
+                }
+                .padding(.horizontal, 22).padding(.top, 20)
+
+                Text("Permanent bonuses apply every run")
+                    .font(SwarmTheme.ui(13)).foregroundColor(SwarmTheme.foam.opacity(0.55))
+
+                ScrollView {
+                    VStack(spacing: 10) {
+                        ForEach(MetaCatalog.all) { up in
+                            metaRow(up)
+                        }
+                    }
+                    .padding(.horizontal, 22)
+                }
+
+                Button("Back") { model.closeMeta() }
+                    .buttonStyle(NeonButton(tint: Color(white: 0.28)))
+                    .padding(.horizontal, 36).padding(.bottom, 36)
+            }
+        }
+    }
+
+    private func metaRow(_ up: MetaUpgrade) -> some View {
+        let lv = meta.level(for: up.id)
+        let maxed = lv >= up.maxLevel
+        let cost = maxed ? 0 : up.cost(lv)
+        let canBuy = meta.canBuy(up)
+
+        return HStack(spacing: 12) {
+            Image(systemName: up.symbol)
+                .font(.system(size: 22, weight: .bold))
+                .foregroundColor(SwarmTheme.cyan)
+                .frame(width: 40)
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 6) {
+                    Text(up.title).font(SwarmTheme.ui(16, .bold)).foregroundColor(SwarmTheme.foam)
+                    Text("Lv \(lv)/\(up.maxLevel)")
+                        .font(SwarmTheme.ui(11, .bold)).foregroundColor(.black)
+                        .padding(.horizontal, 6).padding(.vertical, 2)
+                        .background(SwarmTheme.cyan.opacity(0.85)).clipShape(Capsule())
+                }
+                Text(up.subtitle).font(SwarmTheme.ui(12)).foregroundColor(SwarmTheme.foam.opacity(0.6))
+            }
+            Spacer()
+            if maxed {
+                Text("MAX").font(SwarmTheme.ui(12, .bold)).foregroundColor(SwarmTheme.lime)
+            } else {
+                Button("\(cost)") { model.buyMeta(up.id) }
+                    .font(SwarmTheme.ui(14, .bold))
+                    .foregroundColor(canBuy ? .black : SwarmTheme.foam.opacity(0.4))
+                    .padding(.horizontal, 14).padding(.vertical, 8)
+                    .background(canBuy ? SwarmTheme.lime : Color(white: 0.15))
+                    .clipShape(Capsule())
+                    .disabled(!canBuy)
+            }
+        }
+        .padding(12)
+        .background(RoundedRectangle(cornerRadius: 14).fill(Color(white: 0.1)))
+        .overlay(RoundedRectangle(cornerRadius: 14).stroke(SwarmTheme.cyan.opacity(0.25), lineWidth: 1))
     }
 }
 

@@ -8,9 +8,11 @@ they die, and you level up to pick build-defining upgrades. The longer you last,
 gets. One life. Beat your best time.
 
 ## Status
-- **Real, working iOS app** — compiles (`BUILD SUCCEEDED`), runs on the simulator, full loop:
+- **Real, working iOS app** — compiles, runs on simulator, full loop:
   menu → play → level-up choices → death → stats → retry.
 - Flat neon geometry (no art-asset dependency), camera-follow world, in-scene HUD.
+- **Meta-progression** — earn cores each run, spend them on permanent upgrades between runs.
+- **Juice** — procedural SFX, Core Haptics, floating damage numbers, boss warning at 90s.
 
 ## Gameplay
 - **Move:** floating joystick — touch anywhere and drag.
@@ -20,11 +22,12 @@ gets. One life. Beat your best time.
   - *Bolt* — Sharper Bolts (+dmg), Rapid Fire (rate), Split Shot (+projectile), Piercing.
   - *Orbital Blades* — spinning melee that scales with count + damage.
   - *Shock Nova* — periodic radial pulse; faster + wider.
+  - *Chain Lightning* — arcs between nearby foes; faster + higher voltage.
   - *Passives* — Vitality (max HP), Swift Feet (speed), Magnet (pickup range), Regeneration.
-- **Escalation:** spawn rate, batch size, enemy HP and damage all ramp with time; faster and
-  tankier enemy types unlock at 28s and 60s.
-- **Juice:** hit flashes, death bursts, screen shake + red flash on damage, neon glow, expanding
-  nova rings, best-time persistence.
+- **Enemies:** basic chasers, fast skirmishers (28s+), tanks (60s+), ranged shooters (45s+).
+- **Boss:** arrives at **1:30** — high HP, triple-shot barrage, big XP payout.
+- **Escalation:** spawn rate, batch size, enemy HP and damage all ramp with time.
+- **Meta shop:** spend cores on permanent damage, HP, speed, and magnet bonuses.
 
 ## Run it
 ```bash
@@ -49,18 +52,18 @@ swarm/
       ├─ App/SwarmApp.swift        App entry; hosts SpriteView + SwiftUI overlays
       ├─ Game/GameModel.swift      ObservableObject bridge (phase, HUD, upgrade choices)
       ├─ Game/GameScene.swift      All gameplay (movement, weapons, hordes, XP, juice)
-      ├─ Views/Overlays.swift      Menu / level-up / game-over UI (neon theme)
+      ├─ Game/Feedback.swift       Procedural SFX + Core Haptics
+      ├─ Game/MetaStore.swift      Cores + permanent upgrades (UserDefaults)
+      ├─ Views/Overlays.swift      Menu / level-up / game-over / meta shop UI
       └─ Resources/                Assets.xcassets (app icon + accent)
 ```
 
 ## QA / capture hook
 Launching with the `SWARM_AUTOSTART=1` environment variable auto-starts a run and drives a kiting
-auto-pilot (damage-immune) for headless screenshots. It is gated entirely by that env var and never
-triggers in a normal launch — safe to leave in.
+auto-pilot (damage-immune) for headless screenshots. Gated entirely by that env var — safe to leave in.
 
 ## Next steps (toward a shippable hit)
-- Sound + Core Haptics (hit, level-up, death).
-- More weapons + enemy types + a timed boss; floating damage numbers.
-- Meta-progression between runs (permanent unlocks) — the retention engine for this genre.
-- Game Center leaderboard (best survival time) + a shareable death card (viral hook).
-- TestFlight (needs your Apple Developer signing).
+- Game Center leaderboard (best survival time) + shareable death card.
+- More weapons + enemy archetypes; second boss tier.
+- TestFlight (needs Apple Developer signing).
+- Custom art pass + soundtrack.
