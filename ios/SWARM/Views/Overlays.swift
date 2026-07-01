@@ -84,6 +84,10 @@ struct MenuOverlay: View {
                         get: { model.habitatSite },
                         set: { model.setHabitatSite($0) }
                     ))
+                    TransectModePicker(selection: Binding(
+                        get: { model.transectMode },
+                        set: { model.setTransectMode($0) }
+                    ))
                     DeployModePicker(selection: Binding(
                         get: { model.deployMode },
                         set: { model.setDeployMode($0) }
@@ -321,6 +325,9 @@ struct GameOverOverlay: View {
                             .font(.system(size: 10, weight: .medium, design: .serif))
                             .italic()
                             .foregroundColor(SwarmTheme.foam.opacity(0.5))
+                        Text(v.clipFilename)
+                            .font(SwarmTheme.ui(9, .medium))
+                            .foregroundColor(SwarmTheme.cyan.opacity(0.55))
                     }
                     Spacer()
                     Text("\(Int(v.confidence * 100))%")
@@ -591,6 +598,10 @@ struct LabBoardOverlay: View {
                 Text("Async field detections from your lab mates")
                     .font(SwarmTheme.ui(12))
                     .foregroundColor(SwarmTheme.foam.opacity(0.5))
+                Text("Simulated lab mate activity for demo purposes")
+                    .font(SwarmTheme.ui(10, .medium))
+                    .foregroundColor(SwarmTheme.foam.opacity(0.35))
+                    .italic()
                 ScrollView {
                     VStack(spacing: 8) {
                         ForEach(board.events) { event in
@@ -720,6 +731,42 @@ private struct DeployModePicker: View {
     }
 }
 
+private struct TransectModePicker: View {
+    @Binding var selection: TransectMode
+
+    var body: some View {
+        HStack(spacing: 10) {
+            ForEach(TransectMode.allCases, id: \.self) { mode in
+                Button { selection = mode } label: {
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack(spacing: 6) {
+                            Image(systemName: mode.symbol)
+                                .font(.system(size: 14, weight: .bold))
+                            Text(mode.title)
+                                .font(SwarmTheme.ui(12, .bold))
+                        }
+                        Text(mode.subtitle)
+                            .font(SwarmTheme.ui(9))
+                            .foregroundColor(SwarmTheme.foam.opacity(0.55))
+                            .lineLimit(2)
+                            .multilineTextAlignment(.leading)
+                    }
+                    .foregroundColor(selection == mode ? .black : SwarmTheme.foam.opacity(0.85))
+                    .padding(10)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(selection == mode ? SwarmTheme.cyan : Color(white: 0.12))
+                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(selection == mode ? SwarmTheme.cyan : SwarmTheme.lime.opacity(0.25), lineWidth: 1)
+                    )
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+}
+
 struct CatalogOverlay: View {
     @ObservedObject var model: GameModel
     @ObservedObject private var catalog: SpeciesCatalogStore
@@ -839,7 +886,9 @@ struct PlayingFieldOverlay: View {
                         mission: mission,
                         detections: model.kills,
                         richness: model.speciesRichness,
-                        noiseBudgetPct: model.noiseBudgetPct
+                        noiseBudgetPct: model.noiseBudgetPct,
+                        deploymentId: model.deploymentId,
+                        transectMode: model.transectMode
                     )
                     .padding(.horizontal, 16)
                     .padding(.top, 52)
@@ -913,9 +962,15 @@ private struct VoucherFeedStrip: View {
                     Image(systemName: v.validated ? "checkmark.seal.fill" : "questionmark.circle")
                         .font(.system(size: 10))
                         .foregroundColor(v.validated ? SwarmTheme.lime : SwarmTheme.red.opacity(0.7))
-                    Text(v.commonName)
-                        .font(SwarmTheme.ui(11, .semibold))
-                        .foregroundColor(SwarmTheme.foam.opacity(0.85))
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(v.commonName)
+                            .font(SwarmTheme.ui(11, .semibold))
+                            .foregroundColor(SwarmTheme.foam.opacity(0.85))
+                        Text(v.clipFilename)
+                            .font(SwarmTheme.ui(8, .medium))
+                            .foregroundColor(SwarmTheme.foam.opacity(0.4))
+                            .lineLimit(1)
+                    }
                     Spacer()
                     Text("\(Int(v.confidence * 100))%")
                         .font(SwarmTheme.ui(10, .bold))
@@ -934,6 +989,8 @@ private struct MissionBriefCard: View {
     let detections: Int
     let richness: Int
     let noiseBudgetPct: Int
+    let deploymentId: String?
+    let transectMode: TransectMode
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -942,9 +999,19 @@ private struct MissionBriefCard: View {
                     .font(SwarmTheme.ui(10, .bold))
                     .foregroundColor(SwarmTheme.lime)
                 Spacer()
-                Text(timeStr(mission.transectDurationSec))
-                    .font(SwarmTheme.ui(10, .bold))
-                    .foregroundColor(SwarmTheme.cyan.opacity(0.75))
+                HStack(spacing: 6) {
+                    Text(transectMode.title)
+                        .font(SwarmTheme.ui(9, .bold))
+                        .foregroundColor(SwarmTheme.lime.opacity(0.7))
+                    Text(timeStr(mission.transectDurationSec))
+                        .font(SwarmTheme.ui(10, .bold))
+                        .foregroundColor(SwarmTheme.cyan.opacity(0.75))
+                }
+            }
+            if let dep = deploymentId {
+                Text(dep)
+                    .font(SwarmTheme.ui(9, .medium))
+                    .foregroundColor(SwarmTheme.foam.opacity(0.35))
             }
             Text(mission.title)
                 .font(SwarmTheme.ui(14, .bold))

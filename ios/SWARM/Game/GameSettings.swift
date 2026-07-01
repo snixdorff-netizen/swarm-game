@@ -11,6 +11,7 @@ enum GameSettings {
     static let captionsKey = "swarm_captions_on"
     static let mentorshipKey = "swarm_mentorship_done"
     static let habitatKey = "swarm_habitat_site"
+    static let transectKey = "swarm_transect_mode"
 
     private static var storage: UserDefaults = .standard
 
@@ -70,5 +71,14 @@ enum GameSettings {
             return site
         }
         set { storage.set(newValue.rawValue, forKey: habitatKey) }
+    }
+
+    static var transectMode: TransectMode {
+        get {
+            guard let raw = storage.string(forKey: transectKey),
+                  let mode = TransectMode(rawValue: raw) else { return .fieldDay }
+            return mode
+        }
+        set { storage.set(newValue.rawValue, forKey: transectKey) }
     }
 }

@@ -6,6 +6,10 @@ final class SurveyReportExporterTests: XCTestCase {
         SurveyRunReport(
             missionId: "m1",
             missionTitle: "Dawn Chorus Baseline",
+            deploymentId: "DEP-00001039",
+            siteLabel: "Canopy Transect",
+            recorderProfile: "Song Meter SM5",
+            transectMode: .fieldDay,
             timeSec: 540,
             detections: 3,
             richness: 2,
@@ -17,7 +21,10 @@ final class SurveyReportExporterTests: XCTestCase {
             vouchers: [
                 DetectionVoucher(
                     id: "v1", speciesId: "wood_thrush", commonName: "Wood Thrush",
-                    scientificName: "Hylocichla mustelina", confidence: 0.82, timeSec: 120, validated: true
+                    scientificName: "Hylocichla mustelina", confidence: 0.82, timeSec: 120, validated: true,
+                    deploymentId: "DEP-00001039", siteLabel: "Canopy Transect",
+                    recorderProfile: "Song Meter SM5",
+                    clipFilename: "SWARM_wood_thrush_00001039_001.wav"
                 ),
             ]
         )
@@ -33,8 +40,10 @@ final class SurveyReportExporterTests: XCTestCase {
 
     func testCSVRowsIncludeHeaderAndVoucherLine() {
         let csv = SurveyReportExporter.csvRows(sampleReport(), deployMode: .sm5bat)
+        XCTAssertTrue(csv.contains("deployment_id,mission_id"))
         XCTAssertTrue(csv.contains("species_id,common_name"))
         XCTAssertTrue(csv.contains("wood_thrush"))
-        XCTAssertTrue(csv.contains("sm5bat"))
+        XCTAssertTrue(csv.contains("DEP-00001039"))
+        XCTAssertTrue(csv.contains("SWARM_wood_thrush"))
     }
 }

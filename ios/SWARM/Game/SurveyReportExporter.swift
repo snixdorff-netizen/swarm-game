@@ -6,8 +6,11 @@ enum SurveyReportExporter {
     static func textReport(_ report: SurveyRunReport, deployMode: DeployMode) -> String {
         var lines: [String] = [
             "SWARM — Survey Report",
+            "Deployment: \(report.deploymentId)",
             "Mission: \(report.missionTitle)",
-            "Recorder: \(deployMode.title)",
+            "Site: \(report.siteLabel)",
+            "Recorder: \(report.recorderProfile)",
+            "Transect mode: \(report.transectMode.title)",
             "Transect duration: \(formatTime(report.timeSec))",
             "Survey score: \(report.surveyScore)",
             "Status: \(report.abortReason != nil ? SurveyProtocolCopy.deploymentAborted : (report.missionPassed ? SurveyProtocolCopy.missionPassed : SurveyProtocolCopy.missionIncomplete))",
@@ -26,6 +29,7 @@ enum SurveyReportExporter {
             for v in report.vouchers {
                 let status = v.validated ? SurveyProtocolCopy.validated : SurveyProtocolCopy.tentative
                 lines.append("  \(v.commonName) (\(v.scientificName)) — \(Int(v.confidence * 100))% — \(status) @ \(formatTime(v.timeSec))")
+                lines.append("    clip: \(v.clipFilename) · site: \(v.siteLabel) · \(v.recorderProfile)")
             }
         }
         lines.append("")
@@ -35,12 +39,16 @@ enum SurveyReportExporter {
 
     static func csvRows(_ report: SurveyRunReport, deployMode: DeployMode) -> String {
         var rows = [
-            "mission_id,mission_title,recorder,time_sec,survey_score,mission_passed,detections,richness,mean_confidence,false_positives",
-            "\(csv(report.missionId)),\(csv(report.missionTitle)),\(csv(deployMode.rawValue)),\(report.timeSec),\(report.surveyScore),\(report.missionPassed),\(report.detections),\(report.richness),\(String(format: "%.2f", report.meanConfidence)),\(report.falsePositives)",
-            "species_id,common_name,scientific_name,confidence,time_sec,validated",
+            "deployment_id,mission_id,mission_title,site_label,recorder,transect_mode,time_sec,survey_score,mission_passed,detections,richness,mean_confidence,false_positives",
+            "\(csv(report.deploymentId)),\(csv(report.missionId)),\(csv(report.missionTitle)),\(csv(report.siteLabel)),\(csv(report.recorderProfile)),\(csv(report.transectMode.rawValue)),\(report.timeSec),\(report.surveyScore),\(report.missionPassed),\(report.detections),\(report.richness),\(String(format: "%.2f", report.meanConfidence)),\(report.falsePositives)",
+            "species_id,common_name,scientific_name,confidence,time_sec,validated,deployment_id,site_label,recorder_profile,clip_filename",
         ]
         for v in report.vouchers {
-            rows.append("\(csv(v.speciesId)),\(csv(v.commonName)),\(csv(v.scientificName)),\(String(format: "%.2f", v.confidence)),\(v.timeSec),\(v.validated)")
+            rows.append([
+                csv(v.speciesId), csv(v.commonName), csv(v.scientificName),
+                String(format: "%.2f", v.confidence), "\(v.timeSec)", "\(v.validated)",
+                csv(v.deploymentId), csv(v.siteLabel), csv(v.recorderProfile), csv(v.clipFilename),
+            ].joined(separator: ","))
         }
         return rows.joined(separator: "\n")
     }

@@ -38,6 +38,8 @@ final class GameModel: ObservableObject {
     @Published var runWasNewBest: Bool = false
     @Published var deployMode: DeployMode = .sm5
     @Published var habitatSite: HabitatSite = .canopy
+    @Published var transectMode: TransectMode = .fieldDay
+    @Published var deploymentId: String?
     @Published var spectrogram: SpectrogramSnapshot?
     @Published var activeMission: SurveyMission?
     @Published var surveyReport: SurveyRunReport?
@@ -71,6 +73,7 @@ final class GameModel: ObservableObject {
             deployMode = mode
         }
         habitatSite = GameSettings.habitatSite
+        transectMode = GameSettings.transectMode
         meta.objectWillChange
             .sink { [weak self] _ in self?.objectWillChange.send() }
             .store(in: &cancellables)
@@ -90,6 +93,11 @@ final class GameModel: ObservableObject {
     func setHabitatSite(_ site: HabitatSite) {
         habitatSite = site
         GameSettings.habitatSite = site
+    }
+
+    func setTransectMode(_ mode: TransectMode) {
+        transectMode = mode
+        GameSettings.transectMode = mode
     }
 
     // Wired by the scene
@@ -119,6 +127,7 @@ final class GameModel: ObservableObject {
         speciesRichness = 0
         noiseBudgetPct = 100
         recentVouchers = []
+        deploymentId = nil
         onStart()
     }
 

@@ -14,6 +14,10 @@ final class EngagementCopyTests: XCTestCase {
         SurveyRunReport(
             missionId: "m1",
             missionTitle: "Dawn Chorus Baseline",
+            deploymentId: "DEP-TEST",
+            siteLabel: "Canopy Transect",
+            recorderProfile: "Song Meter SM5",
+            transectMode: .fieldDay,
             timeSec: timeSec,
             detections: detections,
             richness: richness,

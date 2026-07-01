@@ -14,6 +14,7 @@ struct SurveyMission: Equatable, Codable {
     static func random(
         deployMode: DeployMode,
         habitat: HabitatSite = .canopy,
+        transectMode: TransectMode = .fieldDay,
         seed: UInt64 = UInt64.random(in: 0...9999)
     ) -> SurveyMission {
         var rng = SeededRNG(seed: seed)
@@ -35,15 +36,33 @@ struct SurveyMission: Equatable, Codable {
         }()
         let t = templates[Int(rng.nextUnit() * Double(templates.count)) % templates.count]
         let habitatPrefix = habitat == .canopy ? "" : "\(habitat.title) — "
+        let (detections, richness, duration) = scaledTargets(
+            detections: t.2, richness: t.3, duration: t.5, transectMode: transectMode
+        )
         return SurveyMission(
             id: "mission-\(seed)",
             title: habitatPrefix + t.0,
             hypothesis: t.1 + " (\(habitat.subtitle))",
-            targetDetections: t.2,
-            targetRichness: t.3,
+            targetDetections: detections,
+            targetRichness: richness,
             minMeanConfidence: t.4,
-            transectDurationSec: t.5
+            transectDurationSec: duration
         )
+    }
+
+    private static func scaledTargets(
+        detections: Int, richness: Int, duration: Int, transectMode: TransectMode
+    ) -> (Int, Int, Int) {
+        switch transectMode {
+        case .coffeeBreak:
+            return (
+                max(6, Int(Double(detections) * 0.55)),
+                max(2, Int(Double(richness) * 0.6)),
+                min(duration, transectMode.durationCapSec)
+            )
+        case .fieldDay:
+            return (detections, richness, min(duration, transectMode.durationCapSec))
+        }
     }
 }
 
@@ -55,11 +74,19 @@ struct DetectionVoucher: Identifiable, Equatable, Codable {
     let confidence: CGFloat
     let timeSec: Int
     let validated: Bool
+    let deploymentId: String
+    let siteLabel: String
+    let recorderProfile: String
+    let clipFilename: String
 }
 
 struct SurveyRunReport: Equatable, Codable {
     let missionId: String
     let missionTitle: String
+    let deploymentId: String
+    let siteLabel: String
+    let recorderProfile: String
+    let transectMode: TransectMode
     let timeSec: Int
     let detections: Int
     let richness: Int
@@ -91,7 +118,8 @@ enum SurveyScoreEngine {
         timeSec: Int,
         vouchers: [DetectionVoucher],
         aborted: Bool,
-        traineeMode: Bool = false
+        traineeMode: Bool = false,
+        deployment: DeploymentContext? = nil
     ) -> SurveyRunReport {
         let richness = Set(vouchers.map(\.speciesId)).count
         let meanConf = vouchers.isEmpty ? 0 : vouchers.map(\.confidence).reduce(0, +) / CGFloat(vouchers.count)
@@ -108,9 +136,16 @@ enum SurveyScoreEngine {
             && meanConf >= confFloor
             && timeSec >= min(120, mission.transectDurationSec / 3)
 
+        let dep = deployment ?? DeploymentContext.fresh(
+            deployMode: .sm5, habitat: .canopy, transectMode: .fieldDay, seed: 0
+        )
         return SurveyRunReport(
             missionId: mission.id,
             missionTitle: mission.title,
+            deploymentId: dep.deploymentId,
+            siteLabel: dep.siteLabel,
+            recorderProfile: dep.recorderProfile,
+            transectMode: dep.transectMode,
             timeSec: timeSec,
             detections: vouchers.count,
             richness: richness,

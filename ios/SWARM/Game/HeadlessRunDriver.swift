@@ -25,9 +25,11 @@ enum HeadlessRunDriver {
         GameSettings.mentorshipCompleted = true
         GameSettings.traineeMode = false
         GameSettings.habitatSite = .canopy
+        GameSettings.transectMode = .fieldDay
         let model = GameModel(meta: store)
         model.setDeployMode(.sm5)
         model.setHabitatSite(.canopy)
+        model.setTransectMode(.fieldDay)
         let scene = GameScene(size: CGSize(width: 430, height: 932))
         scene.model = model
         scene.testing_attach(to: view)

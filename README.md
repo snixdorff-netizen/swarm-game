@@ -16,12 +16,30 @@ Beat your best **survey score**.
 - **P0 trust wave** — protocol vocabulary, mission briefs, mini-spectrogram waterfall, 12 project species, survey scoring.
 - **P1 meaning wave** — detection vouchers, study notebook catalog, false-positive mimic penalty, SM5BAT night palette, report export.
 - **P2 joy wave** — habitat sites, mentorship checklist, lab board, citizen-science CSV export, pause/gain/captions/colorblind spectrogram.
+- **P3 trust wave** — voucher metadata (deployment ID, site, recorder, clip filename), coffee-break vs field-day transect toggle, lab board honesty label, README sync.
 - **Meta-progression** — earn survey grants each deployment, spend in Field Lab on permanent rig upgrades.
+
+## Project species (12)
+| Common name | Scientific name | Band |
+|-------------|-----------------|------|
+| Wood Thrush | *Hylocichla mustelina* | 2–5 kHz flute song |
+| Ovenbird | *Seiurus aurocapilla* | 3–7 kHz teacher call |
+| Scarlet Tanager | *Piranga olivacea* | 2–8 kHz burry phrases |
+| Blackburnian Warbler | *Setophaga fusca* | 4–10 kHz thin trill |
+| Cedar Waxwing | *Bombycilla cedrorum* | 5–12 kHz high buzz |
+| American Bullfrog | *Lithobates catesbeianus* | 80–300 Hz jug-o-rum |
+| Barred Owl | *Strix varia* | 120–500 Hz who-cooks |
+| Northern Mockingbird | *Mimus polyglottos* | Variable mimic |
+| Red-winged Blackbird | *Agelaius phoeniceus* | 1–4 kHz conk-a-ree |
+| Little Brown Bat | *Myotis lucifugus* | 25–60 kHz† |
+| Hoary Bat | *Lasiurus cinereus* | 20–45 kHz† |
+| Big Brown Bat | *Eptesicus fuscus* | 30–80 kHz† |
 
 ## Gameplay
 - **Move:** floating joystick — deploy quietly through the survey grid.
-- **Listen:** classifiers auto-scan; fauna appear as you enter acoustic detection range.
-- **Identify:** confirmed IDs log species (Passerine, Swift Trill, Resonant Drone, Echo Mimic…).
+- **Listen:** classifiers auto-scan; fauna appear as you enter acoustic detection range. Tap **Listen** for a spectrogram burst and higher-confidence IDs.
+- **Identify:** confirmed detections log species with voucher metadata (deployment ID, site, recorder, pseudo-WAV clip name).
+- **Transect modes:** **Coffee Break** (8-min slice, scaled targets) or **Field Day** (full 8–12 min protocol).
 - **Rank up:** collect green recording clips → choose 1 of 3 **field kit** modules.
 - **Field kit:**
   - *Narrow-Beam Mic* — classifier gain, fast sampling, multi-channel array, band-pass filter.
@@ -31,7 +49,9 @@ Beat your best **survey score**.
   - *Passive Monitor* — recover signal clarity on confirm.
   - *Quiet Approach*, *Clip Magnet*, *Noise Floor Recovery*, *Field Stamina*.
 - **Field Lab (meta):** Amp Gain, Rugged Housing, Quiet Trek, Kaleidoscope Reach, Catalog Accelerator, Passive Monitor.
+- **Habitat sites:** Canopy Transect, Wetland Edge, Coastal Marsh — species pools shift per site.
 - **Rare event @ 1:30:** endangered ultrasonic signature (SM5BAT-class).
+- **Lab board:** async co-op feed (simulated lab mates disclosed in UI).
 
 ## Run it
 ```bash
@@ -58,6 +78,8 @@ cd ios && xcodebuild test -project SWARM.xcodeproj -scheme SWARM -sdk iphonesimu
 ```
 ios/SWARM/
   Game/AcousticFieldCatalog.swift   Species + field kit naming
+  Game/ProjectSpeciesCatalog.swift  12 project species with scientific names
+  Game/TransectMode.swift           Coffee break vs field-day profiles
   Game/GameScene.swift              Survey loop (detection, classifiers, clips)
   Game/BalanceEngine.swift          Spawn + detection + survey milestones
   Views/Overlays.swift              Deploy / Field Lab / survey end UI

@@ -126,6 +126,7 @@ final class GameScene: SKScene {
     private var listenCooldown: CGFloat = 0
     private var listenRecentTimer: CGFloat = 0
     private var runMission = SurveyMission.random(deployMode: .sm5)
+    private var deploymentContext = DeploymentContext.fresh(deployMode: .sm5, habitat: .canopy, transectMode: .fieldDay, seed: 0)
     private var detectionVouchers: [DetectionVoucher] = []
     private var spectrogramSeed: UInt64 = 42
 
@@ -318,7 +319,14 @@ final class GameScene: SKScene {
         detectionVouchers.removeAll()
         spectrogramSeed = UInt64.random(in: 1000...99999)
         let habitat = model?.habitatSite ?? GameSettings.habitatSite
-        runMission = SurveyMission.random(deployMode: deployMode, habitat: habitat, seed: spectrogramSeed)
+        let transect = model?.transectMode ?? GameSettings.transectMode
+        deploymentContext = DeploymentContext.fresh(
+            deployMode: deployMode, habitat: habitat, transectMode: transect, seed: spectrogramSeed
+        )
+        runMission = SurveyMission.random(
+            deployMode: deployMode, habitat: habitat, transectMode: transect, seed: spectrogramSeed
+        )
+        model?.deploymentId = deploymentContext.deploymentId
         model?.activeMission = runMission
         model?.spectrogram = nil
         model?.surveyReport = nil
@@ -934,7 +942,13 @@ final class GameScene: SKScene {
             scientificName: project.scientificName,
             confidence: confidence,
             timeSec: Int(runTime),
-            validated: validated
+            validated: validated,
+            deploymentId: deploymentContext.deploymentId,
+            siteLabel: deploymentContext.siteLabel,
+            recorderProfile: deploymentContext.recorderProfile,
+            clipFilename: VoucherClipNaming.filename(
+                speciesId: project.id, sequence: kills, deploymentId: deploymentContext.deploymentId
+            )
         )
         detectionVouchers.append(voucher)
         model?.speciesRichness = Set(detectionVouchers.map(\.speciesId)).count
@@ -1011,7 +1025,7 @@ final class GameScene: SKScene {
         model?.level = level
         let report = SurveyScoreEngine.compute(
             mission: runMission, timeSec: t, vouchers: detectionVouchers, aborted: aborted,
-            traineeMode: GameSettings.traineeMode
+            traineeMode: GameSettings.traineeMode, deployment: deploymentContext
         )
         model?.surveyReport = report
         model?.coresEarned = MetaStore.coresForRun(kills: kills, timeSec: t)
