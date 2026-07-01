@@ -54,15 +54,15 @@ enum DeployMode: String, CaseIterable, Codable, Equatable {
     /// Scene palette — SM5BAT uses a night-transect look (P1#10).
     var sceneBackground: (r: CGFloat, g: CGFloat, b: CGFloat) {
         switch self {
-        case .sm5: return (0.03, 0.06, 0.05)
-        case .sm5bat: return (0.02, 0.03, 0.10)
+        case .sm5: return (0.082, 0.161, 0.192)   // WA navy #152931
+        case .sm5bat: return (0.102, 0.118, 0.114) // navy + olive night transect
         }
     }
 
     var sceneGrid: (r: CGFloat, g: CGFloat, b: CGFloat) {
         switch self {
-        case .sm5: return (0.08, 0.14, 0.11)
-        case .sm5bat: return (0.06, 0.08, 0.18)
+        case .sm5: return (0.200, 0.239, 0.114)   // WA olive dark #333d1d
+        case .sm5bat: return (0.161, 0.176, 0.231) // muted blue grid for ultrasonic
         }
     }
 

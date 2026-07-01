@@ -64,19 +64,19 @@ private final class Gem {
 
 // MARK: - Palette
 private enum C {
-    static let bg = SKColor(red: 0.03, green: 0.06, blue: 0.05, alpha: 1)
-    static let grid = SKColor(red: 0.08, green: 0.14, blue: 0.11, alpha: 1)
-    static let player = SKColor(red: 0.35, green: 0.85, blue: 0.55, alpha: 1)
-    static let bolt = SKColor(red: 0.55, green: 0.95, blue: 0.85, alpha: 1)
-    static let basic = SKColor(red: 0.45, green: 0.72, blue: 0.38, alpha: 1)
-    static let fast = SKColor(red: 0.72, green: 0.88, blue: 0.42, alpha: 1)
-    static let tank = SKColor(red: 0.28, green: 0.55, blue: 0.42, alpha: 1)
-    static let shooter = SKColor(red: 0.55, green: 0.65, blue: 0.95, alpha: 1)
-    static let boss = SKColor(red: 0.85, green: 0.45, blue: 1.0, alpha: 1)
-    static let gem = SKColor(red: 0.40, green: 0.92, blue: 0.68, alpha: 1)
-    static let chain = SKColor(red: 0.55, green: 0.82, blue: 0.95, alpha: 1)
-    static let orbit = SKColor(red: 0.40, green: 0.88, blue: 0.62, alpha: 1)
-    static let clarity = SKColor(red: 0.95, green: 0.78, blue: 0.28, alpha: 1)
+    static let bg = WildlifeAcousticsPalette.sk(WildlifeAcousticsPalette.navy)
+    static let grid = WildlifeAcousticsPalette.sk(WildlifeAcousticsPalette.oliveDark, alpha: 0.9)
+    static let player = WildlifeAcousticsPalette.sk(WildlifeAcousticsPalette.blue)
+    static let bolt = WildlifeAcousticsPalette.sk(WildlifeAcousticsPalette.blueLight)
+    static let basic = WildlifeAcousticsPalette.sk(WildlifeAcousticsPalette.olive)
+    static let fast = WildlifeAcousticsPalette.sk(WildlifeAcousticsPalette.gold)
+    static let tank = WildlifeAcousticsPalette.sk(WildlifeAcousticsPalette.brown)
+    static let shooter = WildlifeAcousticsPalette.sk(WildlifeAcousticsPalette.blue)
+    static let boss = WildlifeAcousticsPalette.sk(WildlifeAcousticsPalette.gold)
+    static let gem = WildlifeAcousticsPalette.sk(WildlifeAcousticsPalette.gold)
+    static let chain = WildlifeAcousticsPalette.sk(WildlifeAcousticsPalette.blue)
+    static let orbit = WildlifeAcousticsPalette.sk(WildlifeAcousticsPalette.green)
+    static let clarity = WildlifeAcousticsPalette.sk(WildlifeAcousticsPalette.gold)
 }
 
 final class GameScene: SKScene {

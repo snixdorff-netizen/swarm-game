@@ -3,11 +3,15 @@
 import SwiftUI
 
 enum SwarmTheme {
-    static let bg = Color(red: 0.04, green: 0.04, blue: 0.07)
-    static let cyan = Color(red: 0.20, green: 0.88, blue: 1.0)
-    static let red = Color(red: 1.0, green: 0.30, blue: 0.42)
-    static let lime = Color(red: 0.71, green: 1.0, blue: 0.36)
-    static let foam = Color(white: 0.95)
+    static let bg = WildlifeAcousticsPalette.swiftUI(WildlifeAcousticsPalette.navy)
+    static let cyan = WildlifeAcousticsPalette.swiftUI(WildlifeAcousticsPalette.blue)
+    static let red = WildlifeAcousticsPalette.swiftUI(WildlifeAcousticsPalette.red)
+    static let lime = WildlifeAcousticsPalette.swiftUI(WildlifeAcousticsPalette.gold)
+    static let olive = WildlifeAcousticsPalette.swiftUI(WildlifeAcousticsPalette.olive)
+    static let foam = WildlifeAcousticsPalette.swiftUI(WildlifeAcousticsPalette.cream)
+    static let pearl = WildlifeAcousticsPalette.swiftUI(WildlifeAcousticsPalette.pearl)
+    static let panel = WildlifeAcousticsPalette.swiftUI(WildlifeAcousticsPalette.oliveDark, opacity: 0.72)
+    static let panelMuted = WildlifeAcousticsPalette.swiftUI(WildlifeAcousticsPalette.brown, opacity: 0.55)
     static func title(_ s: CGFloat) -> Font { .system(size: s, weight: .heavy, design: .rounded) }
     static func ui(_ s: CGFloat, _ w: Font.Weight = .semibold) -> Font { .system(size: s, weight: w, design: .rounded) }
 }
@@ -17,7 +21,7 @@ private struct NeonButton: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(SwarmTheme.ui(20, .bold))
-            .foregroundColor(.black)
+            .foregroundColor(SwarmTheme.foam)
             .padding(.vertical, 16).padding(.horizontal, 30)
             .frame(maxWidth: .infinity)
             .background(tint)
@@ -93,9 +97,9 @@ struct MenuOverlay: View {
                         set: { model.setDeployMode($0) }
                     ))
                     Button(AcousticFieldCopy.deployButton) { model.start() }.buttonStyle(NeonButton())
-                    Button("Lab Board") { model.openLabBoard() }.buttonStyle(NeonButton(tint: Color(white: 0.24)))
-                    Button("Species Catalog") { model.openCatalog() }.buttonStyle(NeonButton(tint: Color(white: 0.26)))
-                    Button(AcousticFieldCopy.fieldLabButton) { model.openMeta() }.buttonStyle(NeonButton(tint: Color(white: 0.22)))
+                    Button("Lab Board") { model.openLabBoard() }.buttonStyle(NeonButton(tint: SwarmTheme.olive))
+                    Button("Species Catalog") { model.openCatalog() }.buttonStyle(NeonButton(tint: SwarmTheme.panelMuted))
+                    Button(AcousticFieldCopy.fieldLabButton) { model.openMeta() }.buttonStyle(NeonButton(tint: WildlifeAcousticsPalette.swiftUI(WildlifeAcousticsPalette.brown)))
                     if seenHint {
                         Text("Drag to move · classifiers scan automatically · IDs archive on confirm")
                             .font(SwarmTheme.ui(12)).foregroundColor(SwarmTheme.foam.opacity(0.5))
@@ -131,7 +135,7 @@ private struct FirstRunHint: View {
             }
         }
         .padding(14)
-        .background(RoundedRectangle(cornerRadius: 14).fill(Color(white: 0.12)))
+        .background(RoundedRectangle(cornerRadius: 14).fill(SwarmTheme.panel))
         .overlay(RoundedRectangle(cornerRadius: 14).stroke(SwarmTheme.cyan.opacity(0.3), lineWidth: 1))
     }
 }
@@ -182,7 +186,7 @@ private struct ChoiceCard: View {
             Spacer()
         }
         .padding(14)
-        .background(RoundedRectangle(cornerRadius: 16).fill(Color(white: 0.1)))
+        .background(RoundedRectangle(cornerRadius: 16).fill(SwarmTheme.panel))
         .overlay(RoundedRectangle(cornerRadius: 16).stroke(SwarmTheme.cyan.opacity(0.35), lineWidth: 1))
     }
 }
@@ -262,10 +266,10 @@ struct GameOverOverlay: View {
                         Button("Deploy again") { model.start() }.buttonStyle(NeonButton(tint: SwarmTheme.cyan))
                         if report != nil {
                             Button("Export survey report") { showReportExport = true }
-                                .buttonStyle(NeonButton(tint: Color(white: 0.22)))
+                                .buttonStyle(NeonButton(tint: WildlifeAcousticsPalette.swiftUI(WildlifeAcousticsPalette.brown)))
                         }
                         Button("Share") { presentShare() }.buttonStyle(NeonButton(tint: SwarmTheme.lime))
-                        Button("Menu") { model.restart() }.buttonStyle(NeonButton(tint: Color(white: 0.3)))
+                        Button("Menu") { model.restart() }.buttonStyle(NeonButton(tint: WildlifeAcousticsPalette.swiftUI(WildlifeAcousticsPalette.brown)))
                     }
                     .padding(.horizontal, 36)
                     .padding(.top, 16)
@@ -316,7 +320,7 @@ struct GameOverOverlay: View {
                 HStack(spacing: 8) {
                     Image(systemName: v.validated ? "checkmark.seal.fill" : "questionmark.circle")
                         .font(.system(size: 12))
-                        .foregroundColor(v.validated ? SwarmTheme.lime : SwarmTheme.foam.opacity(0.4))
+                        .foregroundColor(v.validated ? SwarmTheme.olive : SwarmTheme.foam.opacity(0.4))
                     VStack(alignment: .leading, spacing: 1) {
                         Text(v.commonName)
                             .font(SwarmTheme.ui(12, .semibold))
@@ -337,7 +341,7 @@ struct GameOverOverlay: View {
             }
         }
         .padding(12)
-        .background(RoundedRectangle(cornerRadius: 12).fill(Color(white: 0.08)))
+        .background(RoundedRectangle(cornerRadius: 12).fill(SwarmTheme.panelMuted))
     }
 
     private func cacheShareImage() {
@@ -395,7 +399,7 @@ struct MetaOverlay: View {
                 }
 
                 Button("Back") { model.closeMeta() }
-                    .buttonStyle(NeonButton(tint: Color(white: 0.28)))
+                    .buttonStyle(NeonButton(tint: SwarmTheme.panelMuted))
                     .padding(.horizontal, 36).padding(.bottom, 36)
             }
         }
@@ -430,13 +434,13 @@ struct MetaOverlay: View {
                     .font(SwarmTheme.ui(14, .bold))
                     .foregroundColor(canBuy ? .black : SwarmTheme.foam.opacity(0.4))
                     .padding(.horizontal, 14).padding(.vertical, 8)
-                    .background(canBuy ? SwarmTheme.lime : Color(white: 0.15))
+                    .background(canBuy ? SwarmTheme.lime : SwarmTheme.panelMuted)
                     .clipShape(Capsule())
                     .disabled(!canBuy)
             }
         }
         .padding(12)
-        .background(RoundedRectangle(cornerRadius: 14).fill(Color(white: 0.1)))
+        .background(RoundedRectangle(cornerRadius: 14).fill(SwarmTheme.panel))
         .overlay(RoundedRectangle(cornerRadius: 14).stroke(SwarmTheme.cyan.opacity(0.25), lineWidth: 1))
     }
 }
@@ -474,13 +478,13 @@ struct SettingsOverlay: View {
                                 .tint(SwarmTheme.cyan)
                         }
                         .padding(14)
-                        .background(RoundedRectangle(cornerRadius: 14).fill(Color(white: 0.1)))
+                        .background(RoundedRectangle(cornerRadius: 14).fill(SwarmTheme.panel))
                         .overlay(RoundedRectangle(cornerRadius: 14).stroke(SwarmTheme.cyan.opacity(0.25), lineWidth: 1))
                     }
                     .padding(.horizontal, 28)
 
                     Button("Back") { model.closeSettings() }
-                        .buttonStyle(NeonButton(tint: Color(white: 0.28)))
+                        .buttonStyle(NeonButton(tint: SwarmTheme.panelMuted))
                         .padding(.horizontal, 36)
                         .padding(.top, 8)
                         .padding(.bottom, 48)
@@ -503,7 +507,7 @@ struct SettingsOverlay: View {
         }
         .tint(SwarmTheme.cyan)
         .padding(14)
-        .background(RoundedRectangle(cornerRadius: 14).fill(Color(white: 0.1)))
+        .background(RoundedRectangle(cornerRadius: 14).fill(SwarmTheme.panel))
         .overlay(RoundedRectangle(cornerRadius: 14).stroke(SwarmTheme.cyan.opacity(0.25), lineWidth: 1))
     }
 }
@@ -537,7 +541,7 @@ struct MentorshipOverlay: View {
                     }
                 }
                 .padding(16)
-                .background(RoundedRectangle(cornerRadius: 14).fill(Color(white: 0.1)))
+                .background(RoundedRectangle(cornerRadius: 14).fill(SwarmTheme.panel))
                 .padding(.horizontal, 24)
                 Spacer()
                 Button("Begin transect") { model.completeMentorship() }
@@ -564,8 +568,8 @@ struct PausedOverlay: View {
                     .foregroundColor(SwarmTheme.foam.opacity(0.65))
                 VStack(spacing: 12) {
                     Button("Resume") { model.resume() }.buttonStyle(NeonButton())
-                    Button("Settings") { model.openSettings() }.buttonStyle(NeonButton(tint: Color(white: 0.24)))
-                    Button("Abort to menu") { model.restart() }.buttonStyle(NeonButton(tint: Color(white: 0.3)))
+                    Button("Settings") { model.openSettings() }.buttonStyle(NeonButton(tint: SwarmTheme.olive))
+                    Button("Abort to menu") { model.restart() }.buttonStyle(NeonButton(tint: WildlifeAcousticsPalette.swiftUI(WildlifeAcousticsPalette.brown)))
                 }
                 .padding(.horizontal, 36)
             }
@@ -614,7 +618,7 @@ struct LabBoardOverlay: View {
                     .buttonStyle(NeonButton(tint: SwarmTheme.lime))
                     .padding(.horizontal, 36)
                 Button("Back") { model.closeLabBoard() }
-                    .buttonStyle(NeonButton(tint: Color(white: 0.28)))
+                    .buttonStyle(NeonButton(tint: SwarmTheme.panelMuted))
                     .padding(.horizontal, 36)
                     .padding(.bottom, 36)
             }
@@ -645,7 +649,7 @@ struct LabBoardOverlay: View {
             Spacer()
         }
         .padding(12)
-        .background(RoundedRectangle(cornerRadius: 12).fill(Color(white: 0.1)))
+        .background(RoundedRectangle(cornerRadius: 12).fill(SwarmTheme.panel))
     }
 }
 
@@ -684,7 +688,7 @@ private struct HabitatSitePicker: View {
                     .foregroundColor(selection == site ? .black : SwarmTheme.foam.opacity(0.85))
                     .padding(.vertical, 8)
                     .frame(maxWidth: .infinity)
-                    .background(selection == site ? SwarmTheme.cyan : Color(white: 0.12))
+                    .background(selection == site ? SwarmTheme.cyan : SwarmTheme.panel)
                     .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                 }
                 .buttonStyle(.plain)
@@ -718,7 +722,7 @@ private struct DeployModePicker: View {
                     .foregroundColor(selection == mode ? .black : SwarmTheme.foam.opacity(0.85))
                     .padding(10)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(selection == mode ? SwarmTheme.lime : Color(white: 0.12))
+                    .background(selection == mode ? SwarmTheme.lime : SwarmTheme.panel)
                     .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                     .overlay(
                         RoundedRectangle(cornerRadius: 12)
@@ -754,7 +758,7 @@ private struct TransectModePicker: View {
                     .foregroundColor(selection == mode ? .black : SwarmTheme.foam.opacity(0.85))
                     .padding(10)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(selection == mode ? SwarmTheme.cyan : Color(white: 0.12))
+                    .background(selection == mode ? SwarmTheme.cyan : SwarmTheme.panel)
                     .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                     .overlay(
                         RoundedRectangle(cornerRadius: 12)
@@ -810,7 +814,7 @@ struct CatalogOverlay: View {
                     .buttonStyle(NeonButton(tint: SwarmTheme.lime))
                     .padding(.horizontal, 36)
                 Button("Back") { model.closeCatalog() }
-                    .buttonStyle(NeonButton(tint: Color(white: 0.28)))
+                    .buttonStyle(NeonButton(tint: SwarmTheme.panelMuted))
                     .padding(.horizontal, 36)
                     .padding(.bottom, 36)
             }
@@ -855,7 +859,7 @@ struct CatalogOverlay: View {
             }
         }
         .padding(12)
-        .background(RoundedRectangle(cornerRadius: 12).fill(Color(white: 0.1)))
+        .background(RoundedRectangle(cornerRadius: 12).fill(SwarmTheme.panel))
     }
 
     @ViewBuilder
@@ -970,7 +974,7 @@ private struct VoucherFeedStrip: View {
                 HStack(spacing: 6) {
                     Image(systemName: v.validated ? "checkmark.seal.fill" : "questionmark.circle")
                         .font(.system(size: 10))
-                        .foregroundColor(v.validated ? SwarmTheme.lime : SwarmTheme.red.opacity(0.7))
+                        .foregroundColor(v.validated ? SwarmTheme.olive : SwarmTheme.red.opacity(0.7))
                     VStack(alignment: .leading, spacing: 1) {
                         Text(v.commonName)
                             .font(SwarmTheme.ui(11, .semibold))
@@ -1133,14 +1137,22 @@ struct SpectrogramWaterfallView: View {
                             let v = 0.15 + Double(e) * 0.85
                             return Color(red: v * 0.45, green: v * 0.75, blue: v)
                         }
-                        let hue = 0.52 - Double(row) / Double(fN) * 0.18
-                        return Color(hue: hue, saturation: 0.75, brightness: 0.12 + Double(e) * 0.88)
+                        // WA earth palette: olive low band → gold mid → blue high
+                        let t = Double(row) / Double(max(1, fN - 1))
+                        let energy = 0.18 + Double(e) * 0.82
+                        if t < 0.45 {
+                            return WildlifeAcousticsPalette.swiftUI(WildlifeAcousticsPalette.olive, opacity: energy)
+                        }
+                        if t < 0.72 {
+                            return WildlifeAcousticsPalette.swiftUI(WildlifeAcousticsPalette.gold, opacity: energy)
+                        }
+                        return WildlifeAcousticsPalette.swiftUI(WildlifeAcousticsPalette.blue, opacity: energy * 0.95)
                     }()
                     context.fill(Path(rect), with: .color(color))
                 }
             }
         }
-        .background(Color(red: 0.02, green: 0.03, blue: 0.06))
+        .background(WildlifeAcousticsPalette.swiftUI(WildlifeAcousticsPalette.navy))
     }
 }
 
