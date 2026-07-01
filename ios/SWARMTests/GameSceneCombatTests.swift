@@ -9,8 +9,12 @@ final class GameSceneCombatTests: XCTestCase {
         unsetenv("SWARM_AUTOSTART")
         unsetenv("SWARM_MORTAL_AUTOSTART")
         let view = SKView(frame: CGRect(x: 0, y: 0, width: 430, height: 932))
+        GameSettings.mentorshipCompleted = true
+        GameSettings.traineeMode = false
+        GameSettings.habitatSite = .canopy
         let model = GameModel()
         model.setDeployMode(.sm5)
+        model.setHabitatSite(.canopy)
         let scene = GameScene(size: CGSize(width: 430, height: 932))
         scene.model = model
         scene.testing_attach(to: view)

@@ -11,7 +11,11 @@ struct SurveyMission: Equatable, Codable {
     let minMeanConfidence: CGFloat
     let transectDurationSec: Int
 
-    static func random(deployMode: DeployMode, seed: UInt64 = UInt64.random(in: 0...9999)) -> SurveyMission {
+    static func random(
+        deployMode: DeployMode,
+        habitat: HabitatSite = .canopy,
+        seed: UInt64 = UInt64.random(in: 0...9999)
+    ) -> SurveyMission {
         var rng = SeededRNG(seed: seed)
         let templates: [(String, String, Int, Int, CGFloat, Int)] = {
             switch deployMode {
@@ -30,10 +34,11 @@ struct SurveyMission: Equatable, Codable {
             }
         }()
         let t = templates[Int(rng.nextUnit() * Double(templates.count)) % templates.count]
+        let habitatPrefix = habitat == .canopy ? "" : "\(habitat.title) — "
         return SurveyMission(
             id: "mission-\(seed)",
-            title: t.0,
-            hypothesis: t.1,
+            title: habitatPrefix + t.0,
+            hypothesis: t.1 + " (\(habitat.subtitle))",
             targetDetections: t.2,
             targetRichness: t.3,
             minMeanConfidence: t.4,
@@ -85,7 +90,8 @@ enum SurveyScoreEngine {
         mission: SurveyMission,
         timeSec: Int,
         vouchers: [DetectionVoucher],
-        aborted: Bool
+        aborted: Bool,
+        traineeMode: Bool = false
     ) -> SurveyRunReport {
         let richness = Set(vouchers.map(\.speciesId)).count
         let meanConf = vouchers.isEmpty ? 0 : vouchers.map(\.confidence).reduce(0, +) / CGFloat(vouchers.count)
@@ -93,10 +99,13 @@ enum SurveyScoreEngine {
         var score = richness * 120 + vouchers.count * 8 + Int(meanConf * 80) - falsePos * 25 + min(timeSec, mission.transectDurationSec) / 6
         if aborted { score = max(0, score - 40) }
 
+        let confFloor = traineeMode ? max(0.45, mission.minMeanConfidence - 0.08) : mission.minMeanConfidence
+        let detectionFloor = traineeMode ? max(1, mission.targetDetections - 4) : mission.targetDetections
+        let richnessFloor = traineeMode ? max(1, mission.targetRichness - 1) : mission.targetRichness
         let passed = !aborted
-            && vouchers.count >= mission.targetDetections
-            && richness >= mission.targetRichness
-            && meanConf >= mission.minMeanConfidence
+            && vouchers.count >= detectionFloor
+            && richness >= richnessFloor
+            && meanConf >= confFloor
             && timeSec >= min(120, mission.transectDurationSec / 3)
 
         return SurveyRunReport(

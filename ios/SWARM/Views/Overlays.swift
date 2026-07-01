@@ -80,11 +80,16 @@ struct MenuOverlay: View {
                     if !seenHint {
                         FirstRunHint { seenHint = true }
                     }
+                    HabitatSitePicker(selection: Binding(
+                        get: { model.habitatSite },
+                        set: { model.setHabitatSite($0) }
+                    ))
                     DeployModePicker(selection: Binding(
                         get: { model.deployMode },
                         set: { model.setDeployMode($0) }
                     ))
                     Button(AcousticFieldCopy.deployButton) { model.start() }.buttonStyle(NeonButton())
+                    Button("Lab Board") { model.openLabBoard() }.buttonStyle(NeonButton(tint: Color(white: 0.24)))
                     Button("Species Catalog") { model.openCatalog() }.buttonStyle(NeonButton(tint: Color(white: 0.26)))
                     Button(AcousticFieldCopy.fieldLabButton) { model.openMeta() }.buttonStyle(NeonButton(tint: Color(white: 0.22)))
                     if seenHint {
@@ -433,32 +438,54 @@ struct SettingsOverlay: View {
     @ObservedObject var model: GameModel
     @State private var soundOn = GameSettings.soundEnabled
     @State private var hapticsOn = GameSettings.hapticsEnabled
+    @State private var listenGain = Double(GameSettings.listenGain)
+    @State private var colorblindOn = GameSettings.colorblindSpectrogram
+    @State private var traineeOn = GameSettings.traineeMode
+    @State private var captionsOn = GameSettings.captionsEnabled
 
     var body: some View {
         ZStack {
             SwarmTheme.bg.opacity(0.94).ignoresSafeArea()
-            VStack(spacing: 20) {
-                Text("SETTINGS")
-                    .font(SwarmTheme.title(32))
-                    .foregroundColor(SwarmTheme.cyan)
-                    .padding(.top, 28)
+            ScrollView {
+                VStack(spacing: 20) {
+                    Text("SETTINGS")
+                        .font(SwarmTheme.title(32))
+                        .foregroundColor(SwarmTheme.cyan)
+                        .padding(.top, 28)
 
-                VStack(spacing: 12) {
-                    settingsToggle("Field Audio", isOn: $soundOn)
-                    settingsToggle("Haptics", isOn: $hapticsOn)
+                    VStack(spacing: 12) {
+                        settingsToggle("Field Audio", isOn: $soundOn)
+                        settingsToggle("Haptics", isOn: $hapticsOn)
+                        settingsToggle("Detection captions", isOn: $captionsOn)
+                        settingsToggle("Trainee mode", isOn: $traineeOn)
+                        settingsToggle("Colorblind spectrogram", isOn: $colorblindOn)
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Listen gain \(Int(listenGain * 100))%")
+                                .font(SwarmTheme.ui(17, .semibold))
+                                .foregroundColor(SwarmTheme.foam)
+                            Slider(value: $listenGain, in: 0.6...1.4, step: 0.05)
+                                .tint(SwarmTheme.cyan)
+                        }
+                        .padding(14)
+                        .background(RoundedRectangle(cornerRadius: 14).fill(Color(white: 0.1)))
+                        .overlay(RoundedRectangle(cornerRadius: 14).stroke(SwarmTheme.cyan.opacity(0.25), lineWidth: 1))
+                    }
+                    .padding(.horizontal, 28)
+
+                    Button("Back") { model.closeSettings() }
+                        .buttonStyle(NeonButton(tint: Color(white: 0.28)))
+                        .padding(.horizontal, 36)
+                        .padding(.top, 8)
+                        .padding(.bottom, 48)
                 }
-                .padding(.horizontal, 28)
-
-                Spacer()
-
-                Button("Back") { model.closeSettings() }
-                    .buttonStyle(NeonButton(tint: Color(white: 0.28)))
-                    .padding(.horizontal, 36)
-                    .padding(.bottom, 48)
             }
         }
         .onBooleanChange(soundOn) { GameSettings.soundEnabled = $0 }
         .onBooleanChange(hapticsOn) { GameSettings.hapticsEnabled = $0 }
+        .onBooleanChange(captionsOn) { GameSettings.captionsEnabled = $0 }
+        .onBooleanChange(traineeOn) { GameSettings.traineeMode = $0 }
+        .onBooleanChange(colorblindOn) { GameSettings.colorblindSpectrogram = $0 }
+        .onDoubleChange(listenGain) { GameSettings.listenGain = Float($0) }
     }
 
     private func settingsToggle(_ title: String, isOn: Binding<Bool>) -> some View {
@@ -471,6 +498,187 @@ struct SettingsOverlay: View {
         .padding(14)
         .background(RoundedRectangle(cornerRadius: 14).fill(Color(white: 0.1)))
         .overlay(RoundedRectangle(cornerRadius: 14).stroke(SwarmTheme.cyan.opacity(0.25), lineWidth: 1))
+    }
+}
+
+struct MentorshipOverlay: View {
+    @ObservedObject var model: GameModel
+
+    var body: some View {
+        ZStack {
+            SwarmTheme.bg.opacity(0.94).ignoresSafeArea()
+            VStack(spacing: 16) {
+                Text("MENTORSHIP DEPLOY")
+                    .font(SwarmTheme.title(34))
+                    .foregroundColor(SwarmTheme.lime)
+                    .padding(.top, 36)
+                Text(MentorshipCopy.briefingLead)
+                    .font(SwarmTheme.ui(14))
+                    .foregroundColor(SwarmTheme.foam.opacity(0.7))
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 28)
+                VStack(alignment: .leading, spacing: 8) {
+                    ForEach(Array(MentorshipCopy.protocolSteps.enumerated()), id: \.offset) { i, step in
+                        HStack(alignment: .top, spacing: 8) {
+                            Text("\(i + 1).")
+                                .font(SwarmTheme.ui(12, .bold))
+                                .foregroundColor(SwarmTheme.cyan)
+                            Text(step)
+                                .font(SwarmTheme.ui(12))
+                                .foregroundColor(SwarmTheme.foam.opacity(0.8))
+                        }
+                    }
+                }
+                .padding(16)
+                .background(RoundedRectangle(cornerRadius: 14).fill(Color(white: 0.1)))
+                .padding(.horizontal, 24)
+                Spacer()
+                Button("Begin transect") { model.completeMentorship() }
+                    .buttonStyle(NeonButton())
+                    .padding(.horizontal, 36)
+                    .padding(.bottom, 48)
+            }
+        }
+    }
+}
+
+struct PausedOverlay: View {
+    @ObservedObject var model: GameModel
+
+    var body: some View {
+        ZStack {
+            Color.black.opacity(0.55).ignoresSafeArea()
+            VStack(spacing: 16) {
+                Text("PAUSED")
+                    .font(SwarmTheme.title(40))
+                    .foregroundColor(SwarmTheme.cyan)
+                Text("Transect on hold — noise floor stable")
+                    .font(SwarmTheme.ui(14))
+                    .foregroundColor(SwarmTheme.foam.opacity(0.65))
+                VStack(spacing: 12) {
+                    Button("Resume") { model.resume() }.buttonStyle(NeonButton())
+                    Button("Settings") { model.openSettings() }.buttonStyle(NeonButton(tint: Color(white: 0.24)))
+                    Button("Abort to menu") { model.restart() }.buttonStyle(NeonButton(tint: Color(white: 0.3)))
+                }
+                .padding(.horizontal, 36)
+            }
+        }
+    }
+}
+
+struct LabBoardOverlay: View {
+    @ObservedObject var model: GameModel
+    @ObservedObject private var board: LabBoardStore
+    @State private var showExport = false
+
+    init(model: GameModel) {
+        self.model = model
+        _board = ObservedObject(wrappedValue: model.labBoard)
+    }
+
+    var body: some View {
+        ZStack {
+            SwarmTheme.bg.opacity(0.94).ignoresSafeArea()
+            VStack(spacing: 12) {
+                HStack {
+                    Text("LAB BOARD")
+                        .font(SwarmTheme.title(30))
+                        .foregroundColor(SwarmTheme.cyan)
+                    Spacer()
+                }
+                .padding(.horizontal, 22)
+                .padding(.top, 20)
+                Text("Async field detections from your lab mates")
+                    .font(SwarmTheme.ui(12))
+                    .foregroundColor(SwarmTheme.foam.opacity(0.5))
+                ScrollView {
+                    VStack(spacing: 8) {
+                        ForEach(board.events) { event in
+                            labRow(event)
+                        }
+                    }
+                    .padding(.horizontal, 22)
+                }
+                Button("Export notebook CSV") { showExport = true }
+                    .buttonStyle(NeonButton(tint: SwarmTheme.lime))
+                    .padding(.horizontal, 36)
+                Button("Back") { model.closeLabBoard() }
+                    .buttonStyle(NeonButton(tint: Color(white: 0.28)))
+                    .padding(.horizontal, 36)
+                    .padding(.bottom, 36)
+            }
+        }
+        .sheet(isPresented: $showExport) {
+            ActivityShareSheet(items: [
+                CitizenScienceExporter.catalogCSV(catalog: model.catalog, habitat: model.habitatSite),
+                CitizenScienceExporter.metadataJSON(habitat: model.habitatSite, deployMode: model.deployMode, catalog: model.catalog),
+            ])
+        }
+    }
+
+    private func labRow(_ event: LabBoardEvent) -> some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: event.mateName == "You" ? "person.fill" : "person.2.fill")
+                .foregroundColor(event.mateName == "You" ? SwarmTheme.lime : SwarmTheme.cyan.opacity(0.8))
+            VStack(alignment: .leading, spacing: 2) {
+                Text("\(event.mateName) · \(event.siteLabel)")
+                    .font(SwarmTheme.ui(12, .bold))
+                    .foregroundColor(SwarmTheme.foam)
+                Text("\(event.speciesCommon) (\(event.speciesScientific))")
+                    .font(SwarmTheme.ui(11))
+                    .foregroundColor(SwarmTheme.foam.opacity(0.65))
+                Text(event.recorder)
+                    .font(SwarmTheme.ui(9))
+                    .foregroundColor(SwarmTheme.foam.opacity(0.4))
+            }
+            Spacer()
+        }
+        .padding(12)
+        .background(RoundedRectangle(cornerRadius: 12).fill(Color(white: 0.1)))
+    }
+}
+
+struct CaptionOverlay: View {
+    let text: String
+    var body: some View {
+        VStack {
+            Spacer()
+            Text(text)
+                .font(SwarmTheme.ui(13, .semibold))
+                .foregroundColor(SwarmTheme.foam)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 8)
+                .background(RoundedRectangle(cornerRadius: 10).fill(Color.black.opacity(0.72)))
+                .padding(.bottom, 120)
+        }
+        .allowsHitTesting(false)
+    }
+}
+
+private struct HabitatSitePicker: View {
+    @Binding var selection: HabitatSite
+
+    var body: some View {
+        HStack(spacing: 8) {
+            ForEach(HabitatSite.allCases, id: \.self) { site in
+                Button { selection = site } label: {
+                    VStack(spacing: 3) {
+                        Image(systemName: site.symbol)
+                            .font(.system(size: 13, weight: .bold))
+                        Text(site.title)
+                            .font(SwarmTheme.ui(9, .bold))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.8)
+                    }
+                    .foregroundColor(selection == site ? .black : SwarmTheme.foam.opacity(0.85))
+                    .padding(.vertical, 8)
+                    .frame(maxWidth: .infinity)
+                    .background(selection == site ? SwarmTheme.cyan : Color(white: 0.12))
+                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                }
+                .buttonStyle(.plain)
+            }
+        }
     }
 }
 
@@ -515,6 +723,7 @@ private struct DeployModePicker: View {
 struct CatalogOverlay: View {
     @ObservedObject var model: GameModel
     @ObservedObject private var catalog: SpeciesCatalogStore
+    @State private var showCatalogExport = false
 
     init(model: GameModel) {
         self.model = model
@@ -550,11 +759,20 @@ struct CatalogOverlay: View {
                     .padding(.horizontal, 22)
                 }
 
+                Button("Export pipeline CSV") { showCatalogExport = true }
+                    .buttonStyle(NeonButton(tint: SwarmTheme.lime))
+                    .padding(.horizontal, 36)
                 Button("Back") { model.closeCatalog() }
                     .buttonStyle(NeonButton(tint: Color(white: 0.28)))
                     .padding(.horizontal, 36)
                     .padding(.bottom, 36)
             }
+        }
+        .sheet(isPresented: $showCatalogExport) {
+            ActivityShareSheet(items: [
+                CitizenScienceExporter.catalogCSV(catalog: catalog, habitat: model.habitatSite),
+                CitizenScienceExporter.metadataJSON(habitat: model.habitatSite, deployMode: model.deployMode, catalog: catalog),
+            ])
         }
     }
 
@@ -627,6 +845,17 @@ struct PlayingFieldOverlay: View {
                     .padding(.top, 52)
                 }
                 HStack {
+                    Button {
+                        model.pause()
+                    } label: {
+                        Image(systemName: "pause.fill")
+                            .font(.system(size: 14, weight: .bold))
+                            .foregroundColor(SwarmTheme.foam.opacity(0.85))
+                            .padding(10)
+                            .background(Circle().fill(Color.black.opacity(0.45)))
+                    }
+                    .padding(.leading, 16)
+                    .padding(.top, model.activeMission == nil ? 52 : 8)
                     Spacer()
                     Button {
                         model.listenBurst()
@@ -730,6 +959,12 @@ private struct MissionBriefCard: View {
                 briefStat("\(noiseBudgetPct)%", "noise budget")
             }
             .padding(.top, 2)
+            if GameSettings.traineeMode {
+                Text(MentorshipCopy.traineeHint)
+                    .font(SwarmTheme.ui(9))
+                    .foregroundColor(SwarmTheme.lime.opacity(0.75))
+                    .padding(.top, 2)
+            }
         }
         .padding(12)
         .background(RoundedRectangle(cornerRadius: 14).fill(Color.black.opacity(0.55)))
@@ -817,8 +1052,14 @@ struct SpectrogramWaterfallView: View {
                         width: max(1, cellW),
                         height: max(1, cellH)
                     )
-                    let hue = 0.52 - Double(row) / Double(fN) * 0.18
-                    let color = Color(hue: hue, saturation: 0.75, brightness: 0.12 + Double(e) * 0.88)
+                    let color: Color = {
+                        if GameSettings.colorblindSpectrogram {
+                            let v = 0.15 + Double(e) * 0.85
+                            return Color(red: v * 0.45, green: v * 0.75, blue: v)
+                        }
+                        let hue = 0.52 - Double(row) / Double(fN) * 0.18
+                        return Color(hue: hue, saturation: 0.75, brightness: 0.12 + Double(e) * 0.88)
+                    }()
                     context.fill(Path(rect), with: .color(color))
                 }
             }
@@ -850,6 +1091,15 @@ func timeStr(_ s: Int) -> String { String(format: "%d:%02d", s / 60, s % 60) }
 private extension View {
     @ViewBuilder
     func onBooleanChange(_ value: Bool, perform: @escaping (Bool) -> Void) -> some View {
+        if #available(iOS 17.0, *) {
+            onChange(of: value) { _, newValue in perform(newValue) }
+        } else {
+            onChange(of: value, perform: perform)
+        }
+    }
+
+    @ViewBuilder
+    func onDoubleChange(_ value: Double, perform: @escaping (Double) -> Void) -> some View {
         if #available(iOS 17.0, *) {
             onChange(of: value) { _, newValue in perform(newValue) }
         } else {

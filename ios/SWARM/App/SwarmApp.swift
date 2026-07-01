@@ -45,15 +45,21 @@ struct GameRootView: View {
 
             switch model.phase {
             case .menu: MenuOverlay(model: model)
+            case .mentorship: MentorshipOverlay(model: model)
             case .levelUp: LevelUpOverlay(model: model)
             case .dead: GameOverOverlay(model: model)
             case .meta: MetaOverlay(model: model)
             case .settings: SettingsOverlay(model: model)
             case .catalog: CatalogOverlay(model: model)
+            case .labBoard: LabBoardOverlay(model: model)
+            case .paused: PausedOverlay(model: model)
             case .playing:
                 PlayingFieldOverlay(model: model)
                 if let banner = model.runBanner {
                     RunBannerOverlay(text: banner)
+                }
+                if let caption = model.captionLine, GameSettings.captionsEnabled {
+                    CaptionOverlay(text: caption)
                 }
             }
         }

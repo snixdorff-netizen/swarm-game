@@ -317,7 +317,8 @@ final class GameScene: SKScene {
         listenRecentTimer = 0
         detectionVouchers.removeAll()
         spectrogramSeed = UInt64.random(in: 1000...99999)
-        runMission = SurveyMission.random(deployMode: deployMode, seed: spectrogramSeed)
+        let habitat = model?.habitatSite ?? GameSettings.habitatSite
+        runMission = SurveyMission.random(deployMode: deployMode, habitat: habitat, seed: spectrogramSeed)
         model?.activeMission = runMission
         model?.spectrogram = nil
         model?.surveyReport = nil
@@ -510,6 +511,14 @@ final class GameScene: SKScene {
         return BalanceEngine.milestoneSeconds.contains { BalanceEngine.milestoneBanner(for: $0) == banner }
     }
 
+    private func publishCaption(_ text: String) {
+        guard GameSettings.captionsEnabled else { return }
+        model?.captionLine = text
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.6) { [weak self] in
+            if self?.model?.captionLine == text { self?.model?.captionLine = nil }
+        }
+    }
+
     private func pulseMilestone(_ text: String) {
         let n = label(22, weight: .heavy)
         n.text = text
@@ -592,7 +601,8 @@ final class GameScene: SKScene {
         ])))
         let speciesRoll = spawnUnit()
         let archetype = BalanceEngine.speciesArchetype(for: kind, roll: speciesRoll, deployMode: deployMode)
-        let species = ProjectSpeciesCatalog.pick(archetype: archetype, roll: speciesRoll)
+        let habitat = model?.habitatSite ?? GameSettings.habitatSite
+        let species = HabitatSite.pickSpecies(archetype: archetype, roll: speciesRoll, habitat: habitat)
         enemies.append(Enemy(node: node, hp: stats.hp, speed: stats.speed, radius: stats.radius,
                              dmg: stats.damage, xp: stats.xp, kind: kind.rawValue, speciesId: species.id))
     }
@@ -939,6 +949,8 @@ final class GameScene: SKScene {
         let leech = CGFloat(leechLevel) * 5 + leechPerKill * 1.25
         if leech > 0 { hp = min(maxHp, hp + leech) }
         model?.catalog.record(project, deployMode: deployMode)
+        model?.labBoard.noteLocalDetection(species: project, habitat: model?.habitatSite ?? GameSettings.habitatSite, deployMode: deployMode)
+        publishCaption(validated ? "Detection: \(project.commonName)" : "Tentative: \(project.commonName)")
         SpeciesCallSynth.shared.playConfirm(species: legacy)
         SfxPlayer.shared.kill(); Haptics.shared.kill()
         burst(at: e.node.position, color: e.node.color)
@@ -998,7 +1010,8 @@ final class GameScene: SKScene {
         model?.kills = kills
         model?.level = level
         let report = SurveyScoreEngine.compute(
-            mission: runMission, timeSec: t, vouchers: detectionVouchers, aborted: aborted
+            mission: runMission, timeSec: t, vouchers: detectionVouchers, aborted: aborted,
+            traineeMode: GameSettings.traineeMode
         )
         model?.surveyReport = report
         model?.coresEarned = MetaStore.coresForRun(kills: kills, timeSec: t)

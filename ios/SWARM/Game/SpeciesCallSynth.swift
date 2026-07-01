@@ -70,7 +70,8 @@ final class SpeciesCallSynth {
         guard GameSettings.soundEnabled else { return }
         ensureRunning()
         let profile = SpeciesCallProfiles.profile(for: species)
-        let samples = synthesize(profile: profile, pan: pan, volume: volume)
+        let gain = GameSettings.listenGain
+        let samples = synthesize(profile: profile, pan: pan, volume: volume * gain)
         guard !samples.isEmpty else { return }
         let frames = AVAudioFrameCount(samples.count / 2)
         guard let buf = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: frames) else { return }

@@ -45,4 +45,13 @@ final class GameSettingsTests: XCTestCase {
         XCTAssertTrue(GameSettings.soundEnabled)
         XCTAssertTrue(GameSettings.hapticsEnabled)
     }
+
+    func testListenGainAndHabitatPersist() {
+        GameSettings.listenGain = 1.2
+        GameSettings.habitatSite = .wetland
+        GameSettings.traineeMode = true
+        XCTAssertEqual(GameSettings.listenGain, 1.2, accuracy: 0.01)
+        XCTAssertEqual(GameSettings.habitatSite, .wetland)
+        XCTAssertTrue(GameSettings.traineeMode)
+    }
 }

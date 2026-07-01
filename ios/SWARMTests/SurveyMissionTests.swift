@@ -55,4 +55,21 @@ final class SurveyMissionTests: XCTestCase {
         XCTAssertLessThan(SurveyScoreEngine.confidence(for: 3, listenBurstRecently: false), 0.5)
         XCTAssertGreaterThan(SurveyScoreEngine.confidence(for: 3, listenBurstRecently: true), 0.7)
     }
+
+    func testTraineeModeRelaxesPassThreshold() {
+        let mission = SurveyMission(
+            id: "t", title: "Trainee", hypothesis: "H",
+            targetDetections: 10, targetRichness: 3, minMeanConfidence: 0.70, transectDurationSec: 480
+        )
+        let vouchers = (0..<7).map { i in
+            DetectionVoucher(
+                id: "v\(i)", speciesId: "sp\(i % 3)", commonName: "Sp \(i)", scientificName: "S. \(i)",
+                confidence: 0.63, timeSec: 30 + i * 10, validated: true
+            )
+        }
+        let strict = SurveyScoreEngine.compute(mission: mission, timeSec: 200, vouchers: vouchers, aborted: false, traineeMode: false)
+        let trainee = SurveyScoreEngine.compute(mission: mission, timeSec: 200, vouchers: vouchers, aborted: false, traineeMode: true)
+        XCTAssertFalse(strict.missionPassed)
+        XCTAssertTrue(trainee.missionPassed)
+    }
 }

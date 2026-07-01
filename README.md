@@ -15,6 +15,7 @@ Beat your best **survey score**.
 - **Beta-ready (0.9.0)** — TestFlight tooling, unit tests, CI, Game Center survey-score leaderboard, shareable survey card, settings.
 - **P0 trust wave** — protocol vocabulary, mission briefs, mini-spectrogram waterfall, 12 project species, survey scoring.
 - **P1 meaning wave** — detection vouchers, study notebook catalog, false-positive mimic penalty, SM5BAT night palette, report export.
+- **P2 joy wave** — habitat sites, mentorship checklist, lab board, citizen-science CSV export, pause/gain/captions/colorblind spectrogram.
 - **Meta-progression** — earn survey grants each deployment, spend in Field Lab on permanent rig upgrades.
 
 ## Gameplay

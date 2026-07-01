@@ -14,7 +14,7 @@ struct UpgradeCard: Identifiable {
 }
 
 final class GameModel: ObservableObject {
-    enum Phase { case menu, playing, levelUp, dead, meta, settings, catalog }
+    enum Phase { case menu, playing, levelUp, dead, meta, settings, catalog, labBoard, paused, mentorship }
 
     @Published var phase: Phase = .menu
     @Published var choices: [UpgradeCard] = []
@@ -31,11 +31,13 @@ final class GameModel: ObservableObject {
     // End-of-run snapshot
     @Published var coresEarned: Int = 0
     @Published var runBanner: String?
+    @Published var captionLine: String?
     @Published var nextGoalHint: String?
     @Published var deathHeadline: String = "SURVEY ENDED"
     @Published var deathSubline: String = ""
     @Published var runWasNewBest: Bool = false
     @Published var deployMode: DeployMode = .sm5
+    @Published var habitatSite: HabitatSite = .canopy
     @Published var spectrogram: SpectrogramSnapshot?
     @Published var activeMission: SurveyMission?
     @Published var surveyReport: SurveyRunReport?
@@ -46,6 +48,8 @@ final class GameModel: ObservableObject {
 
     let meta: MetaStore
     let catalog: SpeciesCatalogStore
+    let labBoard: LabBoardStore
+    private var settingsReturnPhase: Phase = .menu
     private var cancellables = Set<AnyCancellable>()
 
     var bestTime: Int { meta.bestTime }
@@ -54,17 +58,26 @@ final class GameModel: ObservableObject {
 
     private static let deployModeKey = "swarm_deploy_mode"
 
-    init(meta: MetaStore = MetaStore(), catalog: SpeciesCatalogStore = SpeciesCatalogStore()) {
+    init(
+        meta: MetaStore = MetaStore(),
+        catalog: SpeciesCatalogStore = SpeciesCatalogStore(),
+        labBoard: LabBoardStore = LabBoardStore()
+    ) {
         self.meta = meta
         self.catalog = catalog
+        self.labBoard = labBoard
         if let raw = UserDefaults.standard.string(forKey: Self.deployModeKey),
            let mode = DeployMode(rawValue: raw) {
             deployMode = mode
         }
+        habitatSite = GameSettings.habitatSite
         meta.objectWillChange
             .sink { [weak self] _ in self?.objectWillChange.send() }
             .store(in: &cancellables)
         catalog.objectWillChange
+            .sink { [weak self] _ in self?.objectWillChange.send() }
+            .store(in: &cancellables)
+        labBoard.objectWillChange
             .sink { [weak self] _ in self?.objectWillChange.send() }
             .store(in: &cancellables)
     }
@@ -74,6 +87,11 @@ final class GameModel: ObservableObject {
         UserDefaults.standard.set(mode.rawValue, forKey: Self.deployModeKey)
     }
 
+    func setHabitatSite(_ site: HabitatSite) {
+        habitatSite = site
+        GameSettings.habitatSite = site
+    }
+
     // Wired by the scene
     var onStart: () -> Void = {}
     var onChoose: (String) -> Void = { _ in }
@@ -81,7 +99,16 @@ final class GameModel: ObservableObject {
     var onListenBurst: () -> Void = {}
 
     func start() {
+        if !GameSettings.mentorshipCompleted {
+            phase = .mentorship
+            return
+        }
+        beginDeployment()
+    }
+
+    func beginDeployment() {
         runBanner = nil
+        captionLine = nil
         nextGoalHint = nil
         deathHeadline = "SURVEY ENDED"
         deathSubline = ""
@@ -94,15 +121,35 @@ final class GameModel: ObservableObject {
         recentVouchers = []
         onStart()
     }
+
+    func completeMentorship() {
+        GameSettings.mentorshipCompleted = true
+        beginDeployment()
+    }
+
     func listenBurst() { onListenBurst() }
     func openCatalog() { phase = .catalog }
     func closeCatalog() { phase = .menu }
+    func openLabBoard() { phase = .labBoard }
+    func closeLabBoard() { phase = .menu }
     func pick(_ id: String) { onChoose(id) }
     func restart() { onRestart() }
     func openMeta() { phase = .meta }
     func closeMeta() { phase = .menu }
-    func openSettings() { guard phase == .menu else { return }; phase = .settings }
-    func closeSettings() { phase = .menu }
+    func openSettings() {
+        guard phase == .menu || phase == .paused else { return }
+        settingsReturnPhase = phase
+        phase = .settings
+    }
+    func closeSettings() { phase = settingsReturnPhase }
+    func pause() {
+        guard phase == .playing else { return }
+        phase = .paused
+    }
+    func resume() {
+        guard phase == .paused else { return }
+        phase = .playing
+    }
     func buyMeta(_ id: String) {
         guard let up = MetaCatalog.all.first(where: { $0.id == id }) else { return }
         meta.buy(up)
