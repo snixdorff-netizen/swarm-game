@@ -1,4 +1,5 @@
 // Automated multi-run session simulation for balance confidence.
+// Mortal mode models HP, incoming damage, and early death using BalanceEngine combat math.
 
 import Foundation
 
@@ -8,33 +9,54 @@ struct RunMetrics: Codable, Equatable {
     let kills: Int
     let level: Int
     let seed: UInt64
+    let died: Bool
+}
+
+enum SimulationMode: Equatable {
+    /// Skilled kiter still takes damage (default balance runs).
+    case mortal(kiting: CGFloat = BalanceEngine.skilledKiterEfficiency)
+    /// Matches SWARM_AUTOSTART QA hook — no incoming damage.
+    case immortalQA
 }
 
 enum RunSimulator {
     static let defaultMaxSeconds = 120
 
-    /// Autopilot session: immortal kiter (matches SWARM_AUTOSTART), deterministic RNG.
     static func simulate(
         profile: BuildProfile,
         seed: UInt64,
         maxSeconds: Int = defaultMaxSeconds,
-        meta: MetaStore? = nil
+        meta: MetaStore? = nil,
+        mode: SimulationMode = .mortal()
     ) -> RunMetrics {
         var rng = SeededRNG(seed: seed)
         var state = BuildState()
+        var metaLeech: CGFloat = 0
         if let meta {
             state.dmgMult = meta.damageMult
             state.maxHp = 100 + meta.bonusHp
             state.moveSpeed = 178 * meta.speedMult
             state.pickupRadius = 78 + meta.bonusMagnet
             state.xpMult = meta.xpMult
+            metaLeech = meta.leechPerKill
         }
         if profile == .metaBoosted {
             state.dmgMult = max(state.dmgMult, 1.15)
             state.xpMult = max(state.xpMult, 1.08)
+            state.maxHp += 16
+        }
+
+        let kiting: CGFloat
+        switch mode {
+        case .immortalQA: kiting = 0
+        case .mortal(let k):
+            var jitter = SeededRNG(seed: seed ^ 0xA5A5_5A5A_C3C3_3C3C)
+            let scale = 0.86 + CGFloat(jitter.nextUnit()) * 0.28
+            kiting = k * scale
         }
 
         var time: CGFloat = 0
+        var hp = state.maxHp
         var kills = 0
         var level = 1
         var xp: CGFloat = 0
@@ -42,58 +64,84 @@ enum RunSimulator {
         var enemyCount = 6
         var spawnTimer: CGFloat = 0
         var bossSpawned = false
+        var died = false
 
-        while time < CGFloat(maxSeconds) {
+        while time < CGFloat(maxSeconds) && hp > 0 {
             let dt: CGFloat = 1.0
             time += dt
             spawnTimer -= dt
             if spawnTimer <= 0 && enemyCount < BalanceEngine.maxEnemies {
                 spawnTimer = BalanceEngine.spawnInterval(runTime: time)
-                let batch = BalanceEngine.spawnBatchSize(runTime: time)
-                enemyCount = min(BalanceEngine.maxEnemies, enemyCount + batch)
+                enemyCount = min(BalanceEngine.maxEnemies, enemyCount + BalanceEngine.spawnBatchSize(runTime: time))
             }
             if !bossSpawned && time >= BalanceEngine.bossSpawnSeconds {
                 bossSpawned = true
                 enemyCount = min(BalanceEngine.maxEnemies, enemyCount + 1)
             }
 
-            let avgRoll = CGFloat(rng.nextUnit())
-            let kind = BalanceEngine.enemyKind(runTime: time, roll: avgRoll)
-            let stats = BalanceEngine.enemyStats(kind: kind, runTime: time)
-            let dps = state.estimatedDPS(enemyCount: enemyCount)
-            let killRate = min(CGFloat(enemyCount), dps / max(4, stats.hp))
+            if state.regen > 0 && hp < state.maxHp {
+                hp = min(state.maxHp, hp + state.regen * dt)
+            }
+
+            let roll = CGFloat(rng.nextUnit())
+            let tickKind = BalanceEngine.enemyKind(runTime: time, roll: roll)
+            let tickStats = BalanceEngine.enemyStats(kind: tickKind, runTime: time)
+            var incoming = BalanceEngine.incomingDamagePerSecond(
+                enemyCount: enemyCount,
+                runTime: time,
+                kitingEfficiency: kiting,
+                bossPresent: bossSpawned
+            )
+            incoming *= tickStats.damage / max(1, BalanceEngine.expectedEnemyMix(runTime: time).damage)
+            if incoming > 0 {
+                hp -= incoming * dt
+            }
+
+            let killRate = BalanceEngine.outgoingKillRate(enemyCount: enemyCount, runTime: time, build: state)
             let killsThisTick = Int(killRate.rounded(.down))
             if killsThisTick > 0 {
                 kills += killsThisTick
                 enemyCount = max(0, enemyCount - killsThisTick)
-                let xpGain = CGFloat(killsThisTick) * stats.xp * state.xpMult
-                xp += xpGain
+                let mix = BalanceEngine.expectedEnemyMix(runTime: time)
+                xp += CGFloat(killsThisTick) * mix.xp * state.xpMult
+                let heal = BalanceEngine.leechHealOnKill(leechLevel: state.leechLevel, metaLeech: metaLeech)
+                if heal > 0 { hp = min(state.maxHp, hp + heal * CGFloat(killsThisTick)) }
                 while xp >= xpToNext {
                     xp -= xpToNext
                     level += 1
                     xpToNext = BalanceEngine.xpThresholdAfterLevel(current: xpToNext)
-                    let pick = BuildState.preferredUpgrade(for: profile)
-                    state.apply(upgradeId: pick)
+                    state.apply(upgradeId: BuildState.preferredUpgrade(for: profile))
                 }
+            }
+
+            _ = rng.nextUnit() // consume RNG per tick for seed-sensitive variance in future tuning
+            if hp <= 0 {
+                hp = 0
+                died = true
+                break
             }
         }
 
+        if time >= CGFloat(maxSeconds) && hp > 0 { died = false }
+
         return RunMetrics(
             profile: profile.rawValue,
-            survivalSec: Int(time.rounded(.down)),
+            survivalSec: max(0, Int(time.rounded(.down))),
             kills: kills,
             level: level,
-            seed: seed
+            seed: seed,
+            died: died
         )
     }
 
     static func batchSimulate(
         count: Int,
         baseSeed: UInt64 = 42,
-        profile: BuildProfile = .baseline
+        profile: BuildProfile = .baseline,
+        mode: SimulationMode = .mortal()
     ) -> [RunMetrics] {
         (0..<count).map { i in
-            simulate(profile: profile, seed: baseSeed &+ UInt64(i))
+            simulate(profile: profile, seed: baseSeed &+ UInt64(i), mode: mode)
         }
     }
 
@@ -107,10 +155,14 @@ enum RunSimulator {
         return sorted[mid]
     }
 
-    static func runsDiverge(_ a: [RunMetrics], _ b: [RunMetrics], atSecond: Int = 60) -> Bool {
-        guard let ka = a.first(where: { $0.survivalSec >= atSecond }),
-              let kb = b.first(where: { $0.survivalSec >= atSecond }) else { return false }
-        return ka.kills != kb.kills || ka.level != kb.level
+    static func survivalVariance(_ runs: [RunMetrics]) -> Int {
+        guard let minS = runs.map(\.survivalSec).min(), let maxS = runs.map(\.survivalSec).max() else { return 0 }
+        return maxS - minS
+    }
+
+    static func runsDivergeOnSurvival(_ a: [RunMetrics], _ b: [RunMetrics]) -> Bool {
+        let ma = medianSurvival(a), mb = medianSurvival(b)
+        return abs(ma - mb) >= 4
     }
 }
 

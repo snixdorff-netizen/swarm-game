@@ -41,4 +41,17 @@ final class BalanceEngineTests: XCTestCase {
     func testBossSpawnAtNinety() {
         XCTAssertEqual(Int(BalanceEngine.bossSpawnSeconds), 90)
     }
+
+    func testIncomingDamageUsesShippedCooldowns() {
+        let dps = BalanceEngine.incomingDamagePerSecond(enemyCount: 20, runTime: 50, kitingEfficiency: 0.38, bossPresent: false)
+        let mix = BalanceEngine.expectedEnemyMix(runTime: 50)
+        let hits = BalanceEngine.contactHitsPerSecond(enemyCount: 20, kitingEfficiency: 0.38)
+        let expectedContact = hits * mix.damage
+        XCTAssertGreaterThanOrEqual(dps, expectedContact * 0.95)
+        XCTAssertLessThan(dps, expectedContact * 3, "Damage must not stack all enemies per tick")
+    }
+
+    func testLeechHealMatchesGameSceneFormula() {
+        XCTAssertEqual(BalanceEngine.leechHealOnKill(leechLevel: 2, metaLeech: 1), 5)
+    }
 }

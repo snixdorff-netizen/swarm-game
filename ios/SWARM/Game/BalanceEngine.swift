@@ -69,4 +69,80 @@ enum BalanceEngine {
         default: return nil
         }
     }
+
+    // MARK: - Combat pressure (mirrors GameScene contact + shooter cadence)
+
+    static let contactHurtCooldown: CGFloat = 0.55
+    static let shotHurtCooldown: CGFloat = 0.45
+    static let playerContactPadding: CGFloat = 13
+    /// Autopilot kiter in SWARM_AUTOSTART avoids most hits; mortal sim uses this proc scale.
+    static let skilledKiterEfficiency: CGFloat = 0.30
+
+    /// Weighted mean enemy mix at `runTime` using the same roll thresholds as spawnOne.
+    static func expectedEnemyMix(runTime: CGFloat) -> EnemyStatBlock {
+        let t = runTime
+        var wBasic: CGFloat = 1, wFast: CGFloat = 0, wShooter: CGFloat = 0, wTank: CGFloat = 0
+        if t > 28 { wFast = 0.42; wBasic = 1 - wFast }
+        if t > 45 { wShooter = 0.28; wBasic = max(0, wBasic - wShooter) }
+        if t > 60 { wTank = 0.16; wBasic = max(0, wBasic - wTank) }
+        let total = wBasic + wFast + wShooter + wTank
+        func blend(_ k: EnemyKind, _ w: CGFloat) -> EnemyStatBlock {
+            let s = enemyStats(kind: k, runTime: t)
+            return EnemyStatBlock(hp: s.hp * w / total, speed: s.speed * w / total,
+                                radius: s.radius * w / total, damage: s.damage * w / total, xp: s.xp * w / total)
+        }
+        let b = blend(.basic, wBasic), f = blend(.fast, wFast), sh = blend(.shooter, wShooter), tk = blend(.tank, wTank)
+        return EnemyStatBlock(
+            hp: b.hp + f.hp + sh.hp + tk.hp,
+            speed: b.speed + f.speed + sh.speed + tk.speed,
+            radius: b.radius + f.radius + sh.radius + tk.radius,
+            damage: b.damage + f.damage + sh.damage + tk.damage,
+            xp: b.xp + f.xp + sh.xp + tk.xp
+        )
+    }
+
+    /// Swarm pressure 0…1 — GameScene applies one contact hit per global hurtCooldown window.
+    static func swarmPressure(enemyCount: Int) -> CGFloat {
+        min(1, CGFloat(enemyCount) / 42)
+    }
+
+    /// Expected contact hits per second (single-target hits, not stacked enemy damage).
+    static func contactHitsPerSecond(enemyCount: Int, kitingEfficiency: CGFloat) -> CGFloat {
+        guard enemyCount > 0, kitingEfficiency > 0 else { return 0 }
+        return swarmPressure(enemyCount: enemyCount) * kitingEfficiency / contactHurtCooldown
+    }
+
+    /// Damage dealt to player in one second — mirrors global hurtCooldown + shooter cadence.
+    static func incomingDamagePerSecond(
+        enemyCount: Int,
+        runTime: CGFloat,
+        kitingEfficiency: CGFloat,
+        bossPresent: Bool
+    ) -> CGFloat {
+        guard enemyCount > 0, kitingEfficiency > 0 else { return 0 }
+        let mix = expectedEnemyMix(runTime: runTime)
+        let contactDPS = contactHitsPerSecond(enemyCount: enemyCount, kitingEfficiency: kitingEfficiency) * mix.damage
+
+        let shooterHits = (runTime > 45 ? min(0.35, CGFloat(enemyCount) * 0.0055) : 0) * kitingEfficiency / shotHurtCooldown
+        let shotDPS = shooterHits * mix.damage * 0.75
+
+        var bossDPS: CGFloat = 0
+        if bossPresent {
+            let boss = enemyStats(kind: .boss, runTime: runTime)
+            bossDPS = kitingEfficiency / 0.9 * boss.damage * 0.35
+        }
+        return contactDPS + shotDPS + bossDPS
+    }
+
+    /// DPS output vs horde — uses BuildState.estimatedDPS on expected mix HP.
+    static func outgoingKillRate(enemyCount: Int, runTime: CGFloat, build: BuildState) -> CGFloat {
+        guard enemyCount > 0 else { return 0 }
+        let mix = expectedEnemyMix(runTime: runTime)
+        let dps = build.estimatedDPS(enemyCount: enemyCount)
+        return min(CGFloat(enemyCount), dps / max(4, mix.hp))
+    }
+
+    static func leechHealOnKill(leechLevel: Int, metaLeech: CGFloat) -> CGFloat {
+        CGFloat(leechLevel) * 2 + metaLeech
+    }
 }
