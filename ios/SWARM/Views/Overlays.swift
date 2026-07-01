@@ -97,7 +97,7 @@ struct MenuOverlay: View {
                     Button("Species Catalog") { model.openCatalog() }.buttonStyle(NeonButton(tint: Color(white: 0.26)))
                     Button(AcousticFieldCopy.fieldLabButton) { model.openMeta() }.buttonStyle(NeonButton(tint: Color(white: 0.22)))
                     if seenHint {
-                        Text("Drag to move · classifiers scan automatically · collect green recording clips")
+                        Text("Drag to move · classifiers scan automatically · IDs archive on confirm")
                             .font(SwarmTheme.ui(12)).foregroundColor(SwarmTheme.foam.opacity(0.5))
                             .multilineTextAlignment(.center)
                     }
@@ -920,6 +920,15 @@ struct PlayingFieldOverlay: View {
                     }
                     .padding(.trailing, 16)
                     .padding(.top, model.activeMission == nil ? 52 : 8)
+                }
+                if model.passiveBatMode {
+                    Text("PASSIVE MONITOR")
+                        .font(SwarmTheme.ui(10, .bold))
+                        .foregroundColor(SwarmTheme.cyan.opacity(0.85))
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 5)
+                        .background(Capsule().fill(Color.black.opacity(0.45)))
+                        .padding(.top, 6)
                 }
                 if let spec = model.spectrogram {
                     SpectrogramStripView(snapshot: spec)

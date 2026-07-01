@@ -40,6 +40,8 @@ final class GameModel: ObservableObject {
     @Published var habitatSite: HabitatSite = .canopy
     @Published var transectMode: TransectMode = .fieldDay
     @Published var deploymentId: String?
+    @Published var passiveBatMode: Bool = false
+    @Published var fieldOverlayHint: String?
     @Published var spectrogram: SpectrogramSnapshot?
     @Published var activeMission: SurveyMission?
     @Published var surveyReport: SurveyRunReport?
@@ -128,6 +130,8 @@ final class GameModel: ObservableObject {
         noiseBudgetPct = 100
         recentVouchers = []
         deploymentId = nil
+        passiveBatMode = false
+        fieldOverlayHint = nil
         onStart()
     }
 

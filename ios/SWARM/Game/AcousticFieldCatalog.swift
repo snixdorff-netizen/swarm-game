@@ -45,9 +45,9 @@ enum AcousticFieldCopy {
     static let shareTagline = "Bioacoustic field survey — SWARM Acoustic"
 
     static let firstRunSteps: [String] = [
-        "Drag to reposition your Song Meter rig",
-        "Listen for band-specific calls (acoustic & ultrasonic)",
-        "Collect recording clips to rank up",
+        "Drag to reposition your Song Meter rig (SM5BAT = passive monitor)",
+        "Listen for band-specific calls — tap Listen for spectrogram burst",
+        "Confirmed IDs archive automatically — rank up your survey rig",
         "Choose field kit modules each rank",
         "Earn survey grants → Field Lab between deployments",
     ]

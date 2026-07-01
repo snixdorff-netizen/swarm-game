@@ -21,13 +21,21 @@ enum BalanceEngine {
     static let milestoneSeconds: [Int] = [30, 60]
     static let killStreakThresholds: [Int] = [25, 50, 100]
 
-    static func spawnInterval(runTime: CGFloat) -> CGFloat {
-        max(0.14, 0.58 - runTime * 0.004)
+    static func spawnInterval(runTime: CGFloat, deployMode: DeployMode = .sm5) -> CGFloat {
+        let base = max(0.14, 0.58 - runTime * 0.004)
+        return base * SurveyFieldProfile.from(deployMode: deployMode).spawnIntervalMult
     }
 
-    static func spawnBatchSize(runTime: CGFloat) -> Int {
-        if runTime < 30 { return 2 }
-        return 2 + Int(runTime / 20)
+    static func spawnBatchSize(runTime: CGFloat, deployMode: DeployMode = .sm5) -> Int {
+        let profile = SurveyFieldProfile.from(deployMode: deployMode)
+        let base: Int
+        if runTime < 30 { base = 2 }
+        else { base = 2 + Int(runTime / 20) }
+        return max(1, base - profile.spawnBatchReduction)
+    }
+
+    static func maxActiveSignatures(deployMode: DeployMode = .sm5) -> Int {
+        SurveyFieldProfile.from(deployMode: deployMode).maxActiveSignatures
     }
 
     /// Deterministic enemy kind from run time and roll in 0...1.
@@ -129,8 +137,16 @@ enum BalanceEngine {
         detectionRadius * 1.42
     }
 
-    /// Casual-friendly hint for the in-run HUD (what to chase next).
-    static func nextGoalHint(timeSec: Int, kills: Int) -> String {
+    /// Casual-friendly hint for the in-run HUD (survey protocol, not combat chase).
+    static func nextGoalHint(timeSec: Int, kills: Int, deployMode: DeployMode = .sm5) -> String {
+        let profile = SurveyFieldProfile.from(deployMode: deployMode)
+        if profile.usesPassivePasses {
+            if timeSec < 30 { return "Passive monitor: log emergence passes" }
+            if timeSec < bossTeaseSeconds { return "Listen for corridor crossing passes" }
+            if timeSec < Int(bossSpawnSeconds) { return "Rare ultrasonic expected ~1:30" }
+            if kills < 12 { return "Goal: 12 validated bat passes" }
+            return "Goal: high-confidence endangered pass"
+        }
         if timeSec < 30 { return "Goal: establish 0:30 baseline" }
         if timeSec < bossTeaseSeconds { return "Goal: reach 1:00 inventory" }
         if timeSec < Int(bossSpawnSeconds) { return "Goal: rare species at 1:30" }

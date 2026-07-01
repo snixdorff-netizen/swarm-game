@@ -21,11 +21,12 @@ private final class Enemy {
     var flash: CGFloat = 0
     var shootTimer: CGFloat = 0
     var callTimer: CGFloat = 0
+    var driftAngle: CGFloat = 0
     init(node: SKSpriteNode, hp: CGFloat, speed: CGFloat, radius: CGFloat, dmg: CGFloat, xp: CGFloat,
-         kind: Int = 0, speciesId: String) {
+         kind: Int = 0, speciesId: String, driftAngle: CGFloat = 0) {
         self.node = node; self.hp = hp; self.maxHp = hp; self.speed = speed
         self.radius = radius; self.dmg = dmg; self.xp = xp; self.kind = kind
-        self.speciesId = speciesId
+        self.speciesId = speciesId; self.driftAngle = driftAngle
         let project = ProjectSpeciesCatalog.with(id: speciesId) ?? ProjectSpeciesCatalog.all[0]
         let profile = SpeciesCallProfiles.profile(for: ProjectSpeciesCatalog.surveySpecies(for: project))
         callTimer = CGFloat.random(in: 0.2...(profile.callInterval * 0.85))
@@ -127,6 +128,7 @@ final class GameScene: SKScene {
     private var listenRecentTimer: CGFloat = 0
     private var runMission = SurveyMission.random(deployMode: .sm5)
     private var deploymentContext = DeploymentContext.fresh(deployMode: .sm5, habitat: .canopy, transectMode: .fieldDay, seed: 0)
+    private var fieldProfile = SurveyFieldProfile.acousticTransect
     private var detectionVouchers: [DetectionVoucher] = []
     private var spectrogramSeed: UInt64 = 42
 
@@ -313,6 +315,9 @@ final class GameScene: SKScene {
         orbitNodes.forEach { $0.removeFromParent() }; orbitNodes.removeAll()
         bossSpawned = false; bossWarnLabel.isHidden = true
         deployMode = model?.deployMode ?? .sm5
+        fieldProfile = SurveyFieldProfile.from(deployMode: deployMode)
+        model?.passiveBatMode = fieldProfile.usesPassivePasses
+        model?.fieldOverlayHint = fieldProfile.fieldOverlayHint
         listenBurstTimer = 0
         listenCooldown = 0
         listenRecentTimer = 0
@@ -334,7 +339,9 @@ final class GameScene: SKScene {
         let meta = model?.meta
         dmgMult = meta?.damageMult ?? 1
         hp = 100 + (meta?.bonusHp ?? 0); maxHp = hp
-        moveSpeed = 178 * (meta?.speedMult ?? 1)
+        moveSpeed = 178 * (meta?.speedMult ?? 1) * fieldProfile.moveSpeedMult
+        xpBar.isHidden = fieldProfile.hideXpBar
+        xpBarBg.isHidden = fieldProfile.hideXpBar
         pickupRadius = 78 + (meta?.bonusMagnet ?? 0); regen = 0
         boltDmg = 12; boltInterval = 0.72; boltTimer = 0; boltCount = 1; boltPierce = 0
         orbitLevel = 0; orbitDmg = 10; novaLevel = 0; novaDmg = 16; novaRadius = 110; novaInterval = 1.6
@@ -345,13 +352,21 @@ final class GameScene: SKScene {
         hitMilestones.removeAll()
         hitKillStreaks.removeAll()
         novaRing.path = CGPath(ellipseIn: CGRect(x: -novaRadius, y: -novaRadius, width: novaRadius*2, height: novaRadius*2), transform: nil)
-        level = 1; xp = 0; xpToNext = BalanceEngine.initialXpToNext(); runTime = 0; kills = 0; spawnTimer = 0
+        level = 1; xp = 0
+        xpToNext = fieldProfile.autoArchiveClips ? 4 : BalanceEngine.initialXpToNext()
+        runTime = 0; kills = 0; spawnTimer = 0
         pPos = .zero; player.position = .zero; player.zRotation = 0
         cam.position = .zero
         publishHUD(); layoutHUD()
         setChrome(true)
-        for _ in 0..<4 { spawnOne() }
+        let initialSpawns = fieldProfile.usesPassivePasses ? 3 : 4
+        for _ in 0..<initialSpawns { spawnOne() }
         model?.phase = .playing
+        if let banner = fieldProfile.emergenceBanner {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { [weak self] in
+                self?.showRunBanner(banner, pulse: false, duration: 3.2)
+            }
+        }
     }
 
     private func setChrome(_ v: Bool) {
@@ -562,10 +577,10 @@ final class GameScene: SKScene {
 
     private func spawn(_ dt: CGFloat) {
         spawnTimer -= dt
-        let interval = BalanceEngine.spawnInterval(runTime: runTime)
-        if spawnTimer <= 0 && enemies.count < BalanceEngine.maxEnemies {
+        let interval = BalanceEngine.spawnInterval(runTime: runTime, deployMode: deployMode)
+        if spawnTimer <= 0 && enemies.count < BalanceEngine.maxActiveSignatures(deployMode: deployMode) {
             spawnTimer = interval
-            let batch = BalanceEngine.spawnBatchSize(runTime: runTime)
+            let batch = BalanceEngine.spawnBatchSize(runTime: runTime, deployMode: deployMode)
             for _ in 0..<batch { spawnOne() }
         }
     }
@@ -611,8 +626,10 @@ final class GameScene: SKScene {
         let archetype = BalanceEngine.speciesArchetype(for: kind, roll: speciesRoll, deployMode: deployMode)
         let habitat = model?.habitatSite ?? GameSettings.habitatSite
         let species = HabitatSite.pickSpecies(archetype: archetype, roll: speciesRoll, habitat: habitat)
+        let drift = fieldProfile.usesPassivePasses ? SurveyFieldProfile.passDriftAngle(spawnAngle: ang) : 0
         enemies.append(Enemy(node: node, hp: stats.hp, speed: stats.speed, radius: stats.radius,
-                             dmg: stats.damage, xp: stats.xp, kind: kind.rawValue, speciesId: species.id))
+                             dmg: stats.damage, xp: stats.xp, kind: kind.rawValue, speciesId: species.id,
+                             driftAngle: drift))
     }
 
     private func maybeBoss() {
@@ -645,12 +662,15 @@ final class GameScene: SKScene {
         let bat = deployMode == .sm5bat
             ? ProjectSpeciesCatalog.with(id: "hoary_bat")!
             : ProjectSpeciesCatalog.with(id: "little_brown_bat")!
+        let drift = fieldProfile.usesPassivePasses ? SurveyFieldProfile.passDriftAngle(spawnAngle: ang) : 0
         enemies.append(Enemy(node: node, hp: stats.hp, speed: stats.speed, radius: stats.radius,
-                             dmg: stats.damage, xp: stats.xp, kind: EnemyKind.boss.rawValue, speciesId: bat.id))
+                             dmg: stats.damage, xp: stats.xp, kind: EnemyKind.boss.rawValue, speciesId: bat.id,
+                             driftAngle: drift))
     }
 
     private func updateEnemies(_ dt: CGFloat) {
-        let chaseMult = 1 + min(0.85, runTime * 0.01)
+        let pursuit = fieldProfile.pursuitFactor
+        let chaseMult = 1 + min(0.35, runTime * 0.006)
         let detectR = BalanceEngine.detectionRadius(
             pickupRadius: pickupRadius, orbitLevel: orbitLevel, chainLevel: chainLevel,
             deployMode: deployMode, listenBurstActive: listenBurstTimer > 0
@@ -663,26 +683,29 @@ final class GameScene: SKScene {
                 visibility = min(1, visibility * deployMode.ultrasonicVisibilityBoost)
             }
             e.node.alpha = e.kind == EnemyKind.boss.rawValue ? max(0.35, visibility) : visibility
-            if e.kind == 3 {
+            if fieldProfile.usesPassivePasses {
+                e.node.position.x += cos(e.driftAngle) * e.speed * fieldProfile.passDriftSpeedMult * dt
+                e.node.position.y += sin(e.driftAngle) * e.speed * fieldProfile.passDriftSpeedMult * dt
+            } else if e.kind == 3 {
                 let keep = e.radius + 140
-                if d < keep { e.node.position.x -= dx/d * e.speed * dt; e.node.position.y -= dy/d * e.speed * dt }
-                else { e.node.position.x += dx/d * e.speed * 0.6 * dt; e.node.position.y += dy/d * e.speed * 0.6 * dt }
+                if d < keep { e.node.position.x -= dx/d * e.speed * pursuit * dt; e.node.position.y -= dy/d * e.speed * pursuit * dt }
+                else { e.node.position.x += dx/d * e.speed * pursuit * 0.5 * dt; e.node.position.y += dy/d * e.speed * pursuit * 0.5 * dt }
                 e.shootTimer -= dt
                 if e.shootTimer <= 0 {
-                    e.shootTimer = 1.35
-                    fireEnemyShot(from: e.node.position, dmg: e.dmg * 0.75)
+                    e.shootTimer = fieldProfile.mimicInterferenceInterval
+                    fireEnemyShot(from: e.node.position, dmg: e.dmg * 0.55)
                 }
             } else if e.kind == 9 {
-                e.node.position.x += dx/d * e.speed * dt
-                e.node.position.y += dy/d * e.speed * dt
+                e.node.position.x += dx/d * e.speed * max(pursuit, 0.28) * dt
+                e.node.position.y += dy/d * e.speed * max(pursuit, 0.28) * dt
                 e.shootTimer -= dt
-                if e.shootTimer <= 0 {
-                    e.shootTimer = 0.9
-                    for i in -1...1 { fireEnemyShot(from: e.node.position, dmg: e.dmg * 0.35, spread: CGFloat(i) * 0.22) }
+                if e.shootTimer <= 0 && !fieldProfile.usesPassivePasses {
+                    e.shootTimer = 1.4
+                    fireEnemyShot(from: e.node.position, dmg: e.dmg * 0.28, spread: 0)
                 }
             } else {
-                e.node.position.x += dx/d * e.speed * chaseMult * dt
-                e.node.position.y += dy/d * e.speed * chaseMult * dt
+                e.node.position.x += dx/d * e.speed * pursuit * chaseMult * dt
+                e.node.position.y += dy/d * e.speed * pursuit * chaseMult * dt
             }
             if e.flash > 0 { e.flash -= dt; if e.flash <= 0 { e.node.colorBlendFactor = 0 } }
             if d < e.radius + 13 && hurtCooldown <= 0 {
@@ -748,8 +771,8 @@ final class GameScene: SKScene {
         let dx = pPos.x - pos.x, dy = pPos.y - pos.y
         let ang = atan2(dy, dx) + spread
         let speed: CGFloat = 210
-        let node = SKSpriteNode(color: C.shooter, size: CGSize(width: 10, height: 10))
-        node.position = pos; node.zPosition = 3
+        let node = SKSpriteNode(color: C.shooter.withAlphaComponent(0.42), size: CGSize(width: 6, height: 6))
+        node.position = pos; node.zPosition = 3; node.alpha = 0.65
         addChild(node)
         enemyShots.append(EnemyShot(node: node, vel: CGVector(dx: cos(ang)*speed, dy: sin(ang)*speed), dmg: dmg, life: 2.8))
     }
@@ -805,8 +828,8 @@ final class GameScene: SKScene {
     }
     private func fireBolt(angle: CGFloat) {
         let speed: CGFloat = 460
-        let node = SKSpriteNode(color: C.bolt, size: CGSize(width: 14, height: 5))
-        node.position = pPos; node.zRotation = angle; node.zPosition = 4
+        let node = SKSpriteNode(color: C.bolt, size: CGSize(width: 20, height: 3))
+        node.position = pPos; node.zRotation = angle; node.zPosition = 4; node.alpha = 0.78
         addChild(node)
         projectiles.append(Projectile(node: node, vel: CGVector(dx: cos(angle)*speed, dy: sin(angle)*speed), dmg: boltDmg * dmgMult, pierce: boltPierce, life: 1.4))
     }
@@ -899,12 +922,11 @@ final class GameScene: SKScene {
 
     // MARK: - Damage / death / xp
 
-    private func damage(_ e: Enemy, _ amount: CGFloat, showFloater: Bool = true) {
-        let dealt = max(1, Int(amount))
+    private func damage(_ e: Enemy, _ amount: CGFloat, showFloater: Bool = false) {
         e.hp -= amount
         e.flash = 0.07
         e.node.color = .white; e.node.colorBlendFactor = 0.9
-        if showFloater { showDamage(at: e.node.position, amount: dealt, boss: e.kind == 9) }
+        if showFloater { showDamage(at: e.node.position, amount: max(1, Int(amount)), boss: e.kind == 9) }
         if Int(runTime * 60) % 3 == 0 { SfxPlayer.shared.hit() }
         if e.hp <= 0 { kill(e) }
     }
@@ -968,7 +990,7 @@ final class GameScene: SKScene {
         SpeciesCallSynth.shared.playConfirm(species: legacy)
         SfxPlayer.shared.kill(); Haptics.shared.kill()
         burst(at: e.node.position, color: e.node.color)
-        dropGem(at: e.node.position, value: e.xp)
+        archiveRecordingClip(at: e.node.position, value: e.xp)
     }
     private func burst(at p: CGPoint, color: SKColor) {
         for _ in 0..<7 {
@@ -978,24 +1000,24 @@ final class GameScene: SKScene {
             s.run(.sequence([.group([.move(by: CGVector(dx: cos(a)*dpx, dy: sin(a)*dpx), duration: 0.3), .fadeOut(withDuration: 0.3)]), .removeFromParent()]))
         }
     }
-    private func dropGem(at p: CGPoint, value: CGFloat) {
-        let node = SKSpriteNode(color: C.gem, size: CGSize(width: 9, height: 9))
-        node.position = p; node.zRotation = .pi/4; node.zPosition = 1; node.glowFor()
-        addChild(node)
-        gems.append(Gem(node: node, value: value))
+    private func archiveRecordingClip(at p: CGPoint, value: CGFloat) {
+        let bar = SKShapeNode(rectOf: CGSize(width: 14, height: 3), cornerRadius: 1)
+        bar.fillColor = C.clarity
+        bar.strokeColor = C.clarity.withAlphaComponent(0.45)
+        bar.position = p
+        bar.zPosition = 2
+        addChild(bar)
+        bar.run(.sequence([
+            .group([.moveBy(x: 0, y: 14, duration: 0.38), .fadeOut(withDuration: 0.38)]),
+            .removeFromParent(),
+        ]))
+        let xpValue = value * fieldProfile.surveyXpMult
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) { [weak self] in
+            self?.gainXP(xpValue)
+        }
+        SfxPlayer.shared.pickup()
     }
     private func updateGems(_ dt: CGFloat) {
-        for g in gems {
-            guard model?.phase == .playing else { break }
-            let dx = pPos.x - g.node.position.x, dy = pPos.y - g.node.position.y
-            let d = (dx*dx + dy*dy).squareRoot()
-            if d < pickupRadius {
-                let pull: CGFloat = 320
-                g.node.position.x += dx/max(1,d) * pull * dt
-                g.node.position.y += dy/max(1,d) * pull * dt
-            }
-            if d < 16 { gainXP(g.value); SfxPlayer.shared.pickup(); g.node.removeFromParent() }
-        }
         gems.removeAll { $0.node.parent == nil }
     }
     private func gainXP(_ v: CGFloat) {
@@ -1124,7 +1146,7 @@ final class GameScene: SKScene {
         model?.hp = max(0, Int(hp)); model?.maxHp = Int(maxHp)
         model?.xp = xp; model?.xpToNext = xpToNext
         let sec = Int(runTime)
-        model?.nextGoalHint = BalanceEngine.nextGoalHint(timeSec: sec, kills: kills)
+        model?.nextGoalHint = BalanceEngine.nextGoalHint(timeSec: sec, kills: kills, deployMode: deployMode)
         timeLabel.text = String(format: "%d:%02d", sec / 60, sec % 60)
         killLabel.text = "\(kills) detections · \(model?.speciesRichness ?? 0) spp"
         lvlLabel.text = "RANK \(level) · \(SurveyProtocolCopy.noiseBudgetLabel) \(model?.noiseBudgetPct ?? 100)%"
@@ -1135,7 +1157,7 @@ final class GameScene: SKScene {
     // MARK: - Touch (floating joystick)
 
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
-        guard model?.phase == .playing, let t = touches.first else { return }
+        guard model?.phase == .playing, fieldProfile.joystickEnabled, let t = touches.first else { return }
         stickAnchor = t.location(in: cam)
         stickBase.position = stickAnchor; stickKnob.position = stickAnchor
         stickBase.isHidden = false; stickKnob.isHidden = false; sticking = true

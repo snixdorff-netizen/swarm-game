@@ -16,7 +16,7 @@ enum DeployMode: String, CaseIterable, Codable, Equatable {
     var subtitle: String {
         switch self {
         case .sm5: return "Acoustic survey — birds & dawn chorus"
-        case .sm5bat: return "Ultrasonic survey — bat passes"
+        case .sm5bat: return "Passive monitor — ultrasonic passes"
         }
     }
 

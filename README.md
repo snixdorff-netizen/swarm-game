@@ -17,6 +17,7 @@ Beat your best **survey score**.
 - **P1 meaning wave** — detection vouchers, study notebook catalog, false-positive mimic penalty, SM5BAT night palette, report export.
 - **P2 joy wave** — habitat sites, mentorship checklist, lab board, citizen-science CSV export, pause/gain/captions/colorblind spectrogram.
 - **P3 trust wave** — voucher metadata (deployment ID, site, recorder, clip filename), coffee-break vs field-day transect toggle, lab board honesty label, README sync.
+- **P4 credibility wave** — combat de-emphasis (no DPS floaters, auto-archived clips, drift-not-chase), passive SM5BAT monitor (stationary rig, crossing passes, emergence window).
 - **Meta-progression** — earn survey grants each deployment, spend in Field Lab on permanent rig upgrades.
 
 ## Project species (12)
@@ -36,11 +37,11 @@ Beat your best **survey score**.
 | Big Brown Bat | *Eptesicus fuscus* | 30–80 kHz† |
 
 ## Gameplay
-- **Move:** floating joystick — deploy quietly through the survey grid.
-- **Listen:** classifiers auto-scan; fauna appear as you enter acoustic detection range. Tap **Listen** for a spectrogram burst and higher-confidence IDs.
+- **Move:** floating joystick on SM5 — walk the transect quietly. **SM5BAT** uses passive monitor mode (slow reposition, no chase).
+- **Listen:** classifiers auto-scan; vocalizations drift into detection range (not horde chase). Tap **Listen** for spectrogram burst + higher-confidence IDs.
 - **Identify:** confirmed detections log species with voucher metadata (deployment ID, site, recorder, pseudo-WAV clip name).
 - **Transect modes:** **Coffee Break** (8-min slice, scaled targets) or **Field Day** (full 8–12 min protocol).
-- **Rank up:** collect green recording clips → choose 1 of 3 **field kit** modules.
+- **Rank up:** confirmed IDs archive automatically → choose 1 of 3 **field kit** modules.
 - **Field kit:**
   - *Narrow-Beam Mic* — classifier gain, fast sampling, multi-channel array, band-pass filter.
   - *Perimeter Song Meters* — edge recorders orbiting your rig.
@@ -80,6 +81,7 @@ ios/SWARM/
   Game/AcousticFieldCatalog.swift   Species + field kit naming
   Game/ProjectSpeciesCatalog.swift  12 project species with scientific names
   Game/TransectMode.swift           Coffee break vs field-day profiles
+  Game/SurveyFieldProfile.swift     Acoustic transect vs passive bat behavior
   Game/GameScene.swift              Survey loop (detection, classifiers, clips)
   Game/BalanceEngine.swift          Spawn + detection + survey milestones
   Views/Overlays.swift              Deploy / Field Lab / survey end UI
