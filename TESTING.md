@@ -28,7 +28,9 @@ Please play **at least 3 runs** (short runs are fine) and note:
 
 - **Controls** — Does the joystick feel responsive? Any stuck input?
 - **Difficulty curve** — Too easy early? Too brutal after 1–2 minutes?
-- **Level-up choices** — Are upgrades clear? Any confusing options?
+- **Level-up choices** — Are upgrades clear? Try Vampiric Leech vs Nova vs Chain paths.
+- **Milestones** — Do 30s / 60s banners feel rewarding? Boss warning at 1:30?
+- **Death screen** — Does the motivational copy make you want one more run?
 - **Performance** — Frame drops, heat, or battery drain on your device?
 - **Audio & haptics** — Toggle in **Settings** (gear on menu); report if broken
 - **Game Center** — Menu shows sign-in status; new best times should post to the leaderboard

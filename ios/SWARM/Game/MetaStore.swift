@@ -21,6 +21,10 @@ enum MetaCatalog {
                     cost: { lv in 7 + lv * 5 }),
         MetaUpgrade(id: "meta_magnet", title: "Gravity Well", subtitle: "+6 pickup range", symbol: "scope", maxLevel: 8,
                     cost: { lv in 5 + lv * 4 }),
+        MetaUpgrade(id: "meta_xp", title: "Data Harvest", subtitle: "+4% XP from kills", symbol: "sparkles", maxLevel: 8,
+                    cost: { lv in 6 + lv * 4 }),
+        MetaUpgrade(id: "meta_leech", title: "Siphon Core", subtitle: "+1 HP on kill", symbol: "drop.fill", maxLevel: 5,
+                    cost: { lv in 10 + lv * 7 }),
     ]
 }
 
@@ -78,6 +82,8 @@ final class MetaStore: ObservableObject {
     var bonusHp: CGFloat { CGFloat(level(for: "meta_hp")) * 8 }
     var speedMult: CGFloat { 1 + CGFloat(level(for: "meta_speed")) * 0.03 }
     var bonusMagnet: CGFloat { CGFloat(level(for: "meta_magnet")) * 6 }
+    var xpMult: CGFloat { 1 + CGFloat(level(for: "meta_xp")) * 0.04 }
+    var leechPerKill: CGFloat { CGFloat(level(for: "meta_leech")) }
 
     private func persist() {
         ud.set(cores, forKey: coresKey)

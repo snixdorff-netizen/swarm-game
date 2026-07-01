@@ -106,10 +106,13 @@ private struct FirstRunHint: View {
                         .foregroundColor(SwarmTheme.foam.opacity(0.45))
                 }
             }
-            Text("Drag anywhere to move. Weapons auto-fire. Collect green gems to level up and pick upgrades.")
-                .font(SwarmTheme.ui(12))
-                .foregroundColor(SwarmTheme.foam.opacity(0.75))
-                .multilineTextAlignment(.leading)
+            VStack(alignment: .leading, spacing: 4) {
+                ForEach(Array(EngagementCopy.firstRunSteps.enumerated()), id: \.offset) { i, step in
+                    Text("\(i + 1). \(step)")
+                        .font(SwarmTheme.ui(11))
+                        .foregroundColor(SwarmTheme.foam.opacity(0.75))
+                }
+            }
         }
         .padding(14)
         .background(RoundedRectangle(cornerRadius: 14).fill(Color(white: 0.12)))
@@ -126,7 +129,7 @@ struct LevelUpOverlay: View {
                 Text("LEVEL \(model.level)")
                     .font(SwarmTheme.title(40)).foregroundColor(SwarmTheme.lime)
                     .shadow(color: SwarmTheme.lime.opacity(0.6), radius: 12)
-                Text("Choose an upgrade")
+                Text("Power spike — pick your path")
                     .font(SwarmTheme.ui(15)).foregroundColor(SwarmTheme.foam.opacity(0.7))
                 VStack(spacing: 12) {
                     ForEach(model.choices) { c in
@@ -188,10 +191,20 @@ struct GameOverOverlay: View {
             SwarmTheme.bg.opacity(0.9).ignoresSafeArea()
             VStack(spacing: 8) {
                 Spacer()
-                Text("YOU DIED").font(SwarmTheme.title(52)).foregroundColor(SwarmTheme.red)
-                    .shadow(color: SwarmTheme.red.opacity(0.6), radius: 16)
+                Text(model.deathHeadline)
+                    .font(SwarmTheme.title(model.runWasNewBest ? 46 : 52))
+                    .foregroundColor(model.runWasNewBest ? SwarmTheme.lime : SwarmTheme.red)
+                    .shadow(color: (model.runWasNewBest ? SwarmTheme.lime : SwarmTheme.red).opacity(0.6), radius: 16)
                 Text("Survived \(timeStr(model.timeSec))")
                     .font(SwarmTheme.ui(22, .bold)).foregroundColor(SwarmTheme.foam).padding(.top, 6)
+                if !model.deathSubline.isEmpty {
+                    Text(model.deathSubline)
+                        .font(SwarmTheme.ui(14))
+                        .foregroundColor(SwarmTheme.foam.opacity(0.65))
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 28)
+                        .padding(.top, 4)
+                }
                 HStack(spacing: 22) {
                     stat("\(model.kills)", "kills")
                     stat("LV \(model.level)", "reached")
@@ -363,6 +376,24 @@ struct SettingsOverlay: View {
         .padding(14)
         .background(RoundedRectangle(cornerRadius: 14).fill(Color(white: 0.1)))
         .overlay(RoundedRectangle(cornerRadius: 14).stroke(SwarmTheme.cyan.opacity(0.25), lineWidth: 1))
+    }
+}
+
+struct RunBannerOverlay: View {
+    let text: String
+    var body: some View {
+        VStack {
+            Text(text)
+                .font(SwarmTheme.ui(15, .bold))
+                .foregroundColor(SwarmTheme.lime)
+                .padding(.horizontal, 18)
+                .padding(.vertical, 10)
+                .background(Capsule().fill(Color.black.opacity(0.55)))
+                .overlay(Capsule().stroke(SwarmTheme.lime.opacity(0.45), lineWidth: 1))
+                .padding(.top, 56)
+            Spacer()
+        }
+        .allowsHitTesting(false)
     }
 }
 

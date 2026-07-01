@@ -103,7 +103,11 @@ final class GameScene: SKScene {
     private var chainDmg: CGFloat = 14
     private var chainInterval: CGFloat = 1.4
     private var chainTimer: CGFloat = 0
+    private var leechLevel: Int = 0
     private var dmgMult: CGFloat = 1
+    private var xpMult: CGFloat = 1
+    private var leechPerKill: CGFloat = 0
+    private var hitMilestones: Set<Int> = []
 
     // World
     private var enemies: [Enemy] = []
@@ -270,8 +274,12 @@ final class GameScene: SKScene {
         boltDmg = 12; boltInterval = 0.72; boltTimer = 0; boltCount = 1; boltPierce = 0
         orbitLevel = 0; orbitDmg = 10; novaLevel = 0; novaDmg = 16; novaRadius = 110; novaInterval = 1.6
         chainLevel = 0; chainDmg = 14; chainInterval = 1.4; chainTimer = 0
+        leechLevel = 0
+        xpMult = meta?.xpMult ?? 1
+        leechPerKill = meta?.leechPerKill ?? 0
+        hitMilestones.removeAll()
         novaRing.path = CGPath(ellipseIn: CGRect(x: -novaRadius, y: -novaRadius, width: novaRadius*2, height: novaRadius*2), transform: nil)
-        level = 1; xp = 0; xpToNext = 6; runTime = 0; kills = 0; spawnTimer = 0
+        level = 1; xp = 0; xpToNext = BalanceEngine.initialXpToNext(); runTime = 0; kills = 0; spawnTimer = 0
         pPos = .zero; player.position = .zero; player.zRotation = 0
         cam.position = .zero
         publishHUD(); layoutHUD()
@@ -301,6 +309,7 @@ final class GameScene: SKScene {
         case "regen": regen += 1.4
         case "chain": if chainLevel == 0 { chainLevel = 1 } else { chainLevel += 1 }; chainInterval = max(0.5, chainInterval * 0.88)
         case "chain_dmg": chainDmg += 9
+        case "leech": if leechLevel == 0 { leechLevel = 1 } else { leechLevel += 1 }
         default: break
         }
         model?.phase = .playing
@@ -358,7 +367,34 @@ final class GameScene: SKScene {
         }
         if hp <= 0 { die() ; return }
         publishHUD()
-        if Int(runTime) != model?.timeSec { model?.timeSec = Int(runTime) }
+        let sec = Int(runTime)
+        if sec != model?.timeSec {
+            model?.timeSec = sec
+            checkMilestones(sec)
+        }
+    }
+
+    private func checkMilestones(_ sec: Int) {
+        guard BalanceEngine.milestoneSeconds.contains(sec), !hitMilestones.contains(sec) else { return }
+        hitMilestones.insert(sec)
+        guard let banner = BalanceEngine.milestoneBanner(for: sec) else { return }
+        model?.runBanner = banner
+        pulseMilestone(banner)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.8) { [weak self] in
+            if self?.model?.runBanner == banner { self?.model?.runBanner = nil }
+        }
+    }
+
+    private func pulseMilestone(_ text: String) {
+        let n = label(22, weight: .heavy)
+        n.text = text
+        n.fontColor = C.gem
+        n.position = CGPoint(x: 0, y: size.height * 0.08)
+        n.zPosition = 55
+        cam.addChild(n)
+        n.run(.sequence([.group([.scale(to: 1.08, duration: 0.2), .fadeIn(withDuration: 0.1)]),
+                         .wait(forDuration: 1.6),
+                         .fadeOut(withDuration: 0.4), .removeFromParent()]))
     }
 
     private func nearestEnemy() -> Enemy? {
@@ -384,10 +420,10 @@ final class GameScene: SKScene {
 
     private func spawn(_ dt: CGFloat) {
         spawnTimer -= dt
-        let interval = max(0.12, 0.5 - runTime * 0.005)
-        if spawnTimer <= 0 && enemies.count < maxEnemies {
+        let interval = BalanceEngine.spawnInterval(runTime: runTime)
+        if spawnTimer <= 0 && enemies.count < BalanceEngine.maxEnemies {
             spawnTimer = interval
-            let batch = 2 + Int(runTime / 18)
+            let batch = BalanceEngine.spawnBatchSize(runTime: runTime)
             for _ in 0..<batch { spawnOne() }
         }
     }
@@ -395,45 +431,46 @@ final class GameScene: SKScene {
         let ang = CGFloat.random(in: 0..<(2 * .pi))
         let dist = max(size.width, size.height) * 0.56
         let pos = CGPoint(x: pPos.x + cos(ang) * dist, y: pPos.y + sin(ang) * dist)
-        let t = runTime
-        var kind = 0
         let roll = CGFloat.random(in: 0..<1)
-        if t > 60 && roll < 0.16 { kind = 2 }
-        else if t > 45 && roll < 0.28 { kind = 3 }
-        else if t > 28 && roll < 0.42 { kind = 1 }
-        let scale = 1 + t * 0.012
-        var color = C.basic, hpv: CGFloat = 18, spd: CGFloat = 52, rad: CGFloat = 12, dmg: CGFloat = 8, xpv: CGFloat = 1, sz: CGFloat = 22
-        if kind == 1 { color = C.fast; hpv = 12; spd = 96; rad = 9; dmg = 7; xpv = 1; sz = 16 }
-        if kind == 2 { color = C.tank; hpv = 70; spd = 34; rad = 19; dmg = 16; xpv = 3; sz = 36 }
-        if kind == 3 { color = C.shooter; hpv = 22; spd = 38; rad = 11; dmg = 5; xpv = 2; sz = 18 }
-        hpv *= scale; dmg *= (1 + t * 0.004)
+        let kind = BalanceEngine.enemyKind(runTime: runTime, roll: roll)
+        let stats = BalanceEngine.enemyStats(kind: kind, runTime: runTime)
+        var color = C.basic, sz: CGFloat = 22
+        switch kind {
+        case .fast: color = C.fast; sz = 16
+        case .tank: color = C.tank; sz = 36
+        case .shooter: color = C.shooter; sz = 18
+        case .boss: color = C.boss; sz = 64
+        default: break
+        }
         let node = SKSpriteNode(color: color, size: CGSize(width: sz, height: sz))
-        node.position = pos; node.zRotation = .pi/4; node.zPosition = 2
-        if kind == 3 { node.zRotation = 0 }
+        node.position = pos; node.zRotation = kind == .shooter ? 0 : .pi/4; node.zPosition = kind == .boss ? 6 : 2
         addChild(node)
-        enemies.append(Enemy(node: node, hp: hpv, speed: spd, radius: rad, dmg: dmg, xp: xpv, kind: kind))
+        enemies.append(Enemy(node: node, hp: stats.hp, speed: stats.speed, radius: stats.radius, dmg: stats.damage, xp: stats.xp, kind: kind.rawValue))
     }
 
     private func maybeBoss() {
-        guard !bossSpawned, runTime >= 90 else { return }
+        guard !bossSpawned, runTime >= BalanceEngine.bossSpawnSeconds else { return }
         bossSpawned = true
         spawnBoss()
     }
 
     private func spawnBoss() {
         SfxPlayer.shared.boss(); Haptics.shared.boss()
+        model?.runBanner = "⚠ BOSS INCOMING"
         bossWarnLabel.text = "⚠ BOSS INCOMING"
         bossWarnLabel.isHidden = false
-        bossWarnLabel.run(.sequence([.wait(forDuration: 2.2), .fadeOut(withDuration: 0.4), .run { [weak self] in self?.bossWarnLabel.isHidden = true; self?.bossWarnLabel.alpha = 1 }]))
+        bossWarnLabel.run(.sequence([.wait(forDuration: 2.2), .fadeOut(withDuration: 0.4), .run { [weak self] in
+            self?.bossWarnLabel.isHidden = true; self?.bossWarnLabel.alpha = 1
+            if self?.model?.runBanner == "⚠ BOSS INCOMING" { self?.model?.runBanner = nil }
+        }]))
         let ang = CGFloat.random(in: 0..<(2 * .pi))
         let dist = max(size.width, size.height) * 0.5
         let pos = CGPoint(x: pPos.x + cos(ang) * dist, y: pPos.y + sin(ang) * dist)
-        let scale = 1 + runTime * 0.012
-        let hpv: CGFloat = 420 * scale
+        let stats = BalanceEngine.enemyStats(kind: .boss, runTime: runTime)
         let node = SKSpriteNode(color: C.boss, size: CGSize(width: 64, height: 64))
         node.position = pos; node.zRotation = .pi/4; node.zPosition = 6
         addChild(node)
-        enemies.append(Enemy(node: node, hp: hpv, speed: 28, radius: 30, dmg: 28, xp: 18, kind: 9))
+        enemies.append(Enemy(node: node, hp: stats.hp, speed: stats.speed, radius: stats.radius, dmg: stats.damage, xp: stats.xp, kind: EnemyKind.boss.rawValue))
     }
 
     private func updateEnemies(_ dt: CGFloat) {
@@ -647,6 +684,8 @@ final class GameScene: SKScene {
         e.node.removeFromParent()
         if let idx = enemies.firstIndex(where: { $0 === e }) { enemies.remove(at: idx) }
         kills += 1; model?.kills = kills
+        let leech = CGFloat(leechLevel) * 2 + leechPerKill
+        if leech > 0 { hp = min(maxHp, hp + leech) }
         SfxPlayer.shared.kill(); Haptics.shared.kill()
         burst(at: e.node.position, color: e.node.color)
         dropGem(at: e.node.position, value: e.xp)
@@ -681,10 +720,10 @@ final class GameScene: SKScene {
     }
     private func gainXP(_ v: CGFloat) {
         guard model?.phase == .playing else { return }
-        xp += v
+        xp += v * xpMult
         if xp >= xpToNext {
             xp -= xpToNext; level += 1
-            xpToNext = ceil(xpToNext * 1.28 + 3)
+            xpToNext = BalanceEngine.xpThresholdAfterLevel(current: xpToNext)
             model?.level = level
             levelUp()
         }
@@ -705,6 +744,10 @@ final class GameScene: SKScene {
         model?.level = level
         model?.coresEarned = MetaStore.coresForRun(kills: kills, timeSec: t)
         let newBest = model?.meta.awardRun(kills: kills, timeSec: t) == true
+        model?.runWasNewBest = newBest
+        let lines = EngagementCopy.deathLines(timeSec: t, kills: kills, level: level, isNewBest: newBest)
+        model?.deathHeadline = lines.headline
+        model?.deathSubline = lines.subline
         if GameCenterLogic.shouldSubmitLeaderboard(newBest: newBest, seconds: t) {
             Task { @MainActor in
                 GameCenterManager.shared.submitBestTime(t)
@@ -743,6 +786,7 @@ final class GameScene: SKScene {
         if regen < 6 { pool.append(UpgradeCard(id: "regen", title: "Regeneration", subtitle: "Heal over time", symbol: "cross.case.fill", levelText: "")) }
         pool.append(UpgradeCard(id: chainLevel == 0 ? "chain" : "chain", title: chainLevel == 0 ? "Chain Lightning" : "Faster Arc", subtitle: chainLevel == 0 ? "Zap chains between foes" : "Arc more often", symbol: "bolt.horizontal.fill", levelText: chainLevel == 0 ? "NEW" : "Lv \(chainLevel+1)"))
         if chainLevel > 0 { pool.append(UpgradeCard(id: "chain_dmg", title: "High Voltage", subtitle: "+chain damage", symbol: "bolt.circle.fill", levelText: "")) }
+        pool.append(UpgradeCard(id: leechLevel == 0 ? "leech" : "leech", title: leechLevel == 0 ? "Vampiric Leech" : "Stronger Leech", subtitle: leechLevel == 0 ? "Heal on kill" : "+heal per kill", symbol: "drop.fill", levelText: leechLevel == 0 ? "NEW" : "Lv \(leechLevel+1)"))
         pool.shuffle()
         return Array(pool.prefix(3))
     }

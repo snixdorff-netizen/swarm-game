@@ -30,6 +30,10 @@ final class GameModel: ObservableObject {
 
     // End-of-run snapshot
     @Published var coresEarned: Int = 0
+    @Published var runBanner: String?
+    @Published var deathHeadline: String = "YOU DIED"
+    @Published var deathSubline: String = ""
+    @Published var runWasNewBest: Bool = false
 
     let meta = MetaStore()
     private var cancellables = Set<AnyCancellable>()
@@ -48,7 +52,13 @@ final class GameModel: ObservableObject {
     var onChoose: (String) -> Void = { _ in }
     var onRestart: () -> Void = {}
 
-    func start() { onStart() }
+    func start() {
+        runBanner = nil
+        deathHeadline = "YOU DIED"
+        deathSubline = ""
+        runWasNewBest = false
+        onStart()
+    }
     func pick(_ id: String) { onChoose(id) }
     func restart() { onRestart() }
     func openMeta() { phase = .meta }

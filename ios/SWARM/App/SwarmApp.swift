@@ -48,7 +48,10 @@ struct GameRootView: View {
             case .dead: GameOverOverlay(model: model)
             case .meta: MetaOverlay(model: model)
             case .settings: SettingsOverlay(model: model)
-            case .playing: EmptyView()
+            case .playing:
+                if let banner = model.runBanner {
+                    RunBannerOverlay(text: banner)
+                }
             }
         }
         .background(SwarmTheme.bg)

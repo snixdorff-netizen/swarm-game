@@ -13,7 +13,8 @@ gets. One life. Beat your best time.
   menu → play → level-up choices → death → stats → retry.
 - Flat neon geometry (no art-asset dependency), camera-follow world, in-scene HUD.
 - **Meta-progression** — earn cores each run, spend them on permanent upgrades between runs.
-- **Juice** — procedural SFX, Core Haptics, floating damage numbers, boss warning at 90s.
+- **Juice** — procedural SFX, Core Haptics, floating damage numbers, survival milestones (30s/60s), boss at 90s.
+- **Balance tooling** — `BalanceEngine` + `RunSimulator` batch metrics for tuning (40 unit tests).
 
 ## Gameplay
 - **Move:** floating joystick — touch anywhere and drag.
@@ -24,7 +25,9 @@ gets. One life. Beat your best time.
   - *Orbital Blades* — spinning melee that scales with count + damage.
   - *Shock Nova* — periodic radial pulse; faster + wider.
   - *Chain Lightning* — arcs between nearby foes; faster + higher voltage.
+  - *Vampiric Leech* — heal on kill; stacks with meta Siphon Core.
   - *Passives* — Vitality (max HP), Swift Feet (speed), Magnet (pickup range), Regeneration.
+  - *Meta* — Overclock, Hull, Thrusters, Gravity Well, Data Harvest (XP), Siphon Core (leech).
 - **Enemies:** basic chasers, fast skirmishers (28s+), tanks (60s+), ranged shooters (45s+).
 - **Boss:** arrives at **1:30** — high HP, triple-shot barrage, big XP payout.
 - **Escalation:** spawn rate, batch size, enemy HP and damage all ramp with time.

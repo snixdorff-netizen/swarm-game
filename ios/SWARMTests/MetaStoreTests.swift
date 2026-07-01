@@ -166,6 +166,15 @@ final class MetaStoreTests: XCTestCase {
         XCTAssertEqual(reloaded.level(for: "meta_dmg"), 0)
     }
 
+    func testXpMultAndLeechScale() {
+        store.awardRun(kills: 400, timeSec: 500)
+        _ = store.buy(upgrade("meta_xp"))
+        _ = store.buy(upgrade("meta_xp"))
+        _ = store.buy(upgrade("meta_leech"))
+        XCTAssertEqual(store.xpMult, 1.08, accuracy: 0.0001)
+        XCTAssertEqual(store.leechPerKill, 1, accuracy: 0.0001)
+    }
+
     func testCanBuyEachCatalogEntry() {
         store.awardRun(kills: 500, timeSec: 600)
         for up in MetaCatalog.all {
