@@ -3,10 +3,13 @@
 import SwiftUI
 
 struct DeathSharePayload {
+    let surveyScore: Int
+    let detections: Int
+    let richness: Int
+    let missionTitle: String?
+    let missionPassed: Bool
     let timeSec: Int
-    let kills: Int
-    let level: Int
-    let bestTime: Int
+    let bestSurveyScore: Int
 }
 
 struct DeathShareCardView: View {
@@ -23,14 +26,28 @@ struct DeathShareCardView: View {
                 Text(AcousticFieldCopy.subtitle)
                     .font(SwarmTheme.ui(13, .semibold))
                     .foregroundColor(SwarmTheme.lime.opacity(0.85))
-                Text("Deployed \(timeStr(payload.timeSec))")
-                    .font(SwarmTheme.ui(26, .bold))
-                    .foregroundColor(SwarmTheme.foam)
-                HStack(spacing: 28) {
-                    shareStat("\(payload.kills)", "confirmed")
-                    shareStat("RANK \(payload.level)", "reached")
-                    shareStat(timeStr(payload.bestTime), "best")
+                if let title = payload.missionTitle {
+                    Text(title)
+                        .font(SwarmTheme.ui(14, .bold))
+                        .foregroundColor(SwarmTheme.foam.opacity(0.75))
+                        .multilineTextAlignment(.center)
                 }
+                Text("Score \(payload.surveyScore)")
+                    .font(SwarmTheme.ui(32, .bold))
+                    .foregroundColor(SwarmTheme.lime)
+                HStack(spacing: 28) {
+                    shareStat("\(payload.detections)", "detections")
+                    shareStat("\(payload.richness)", "species")
+                    shareStat(timeStr(payload.timeSec), "transect")
+                }
+                if payload.missionPassed {
+                    Text(SurveyProtocolCopy.missionPassed)
+                        .font(SwarmTheme.ui(12, .bold))
+                        .foregroundColor(SwarmTheme.lime.opacity(0.85))
+                }
+                Text("Best: \(payload.bestSurveyScore)")
+                    .font(SwarmTheme.ui(14))
+                    .foregroundColor(SwarmTheme.foam.opacity(0.55))
                 Text(AcousticFieldCopy.tagline)
                     .font(SwarmTheme.ui(14))
                     .foregroundColor(SwarmTheme.foam.opacity(0.55))

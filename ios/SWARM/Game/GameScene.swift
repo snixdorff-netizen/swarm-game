@@ -16,15 +16,23 @@ private final class Enemy {
     var radius: CGFloat
     var dmg: CGFloat
     var xp: CGFloat
-    var kind: Int          // 0 basic, 1 fast, 2 tank, 3 shooter, 9 boss
+    var kind: Int          // archetype → EnemyKind stats
+    var speciesId: String
     var flash: CGFloat = 0
     var shootTimer: CGFloat = 0
     var callTimer: CGFloat = 0
-    init(node: SKSpriteNode, hp: CGFloat, speed: CGFloat, radius: CGFloat, dmg: CGFloat, xp: CGFloat, kind: Int = 0) {
+    init(node: SKSpriteNode, hp: CGFloat, speed: CGFloat, radius: CGFloat, dmg: CGFloat, xp: CGFloat,
+         kind: Int = 0, speciesId: String) {
         self.node = node; self.hp = hp; self.maxHp = hp; self.speed = speed
         self.radius = radius; self.dmg = dmg; self.xp = xp; self.kind = kind
-        let profile = SpeciesCallProfiles.profile(for: SurveySpecies.from(enemyKind: kind))
+        self.speciesId = speciesId
+        let project = ProjectSpeciesCatalog.with(id: speciesId) ?? ProjectSpeciesCatalog.all[0]
+        let profile = SpeciesCallProfiles.profile(for: ProjectSpeciesCatalog.surveySpecies(for: project))
         callTimer = CGFloat.random(in: 0.2...(profile.callInterval * 0.85))
+    }
+
+    var projectSpecies: ProjectSpecies {
+        ProjectSpeciesCatalog.with(id: speciesId) ?? ProjectSpeciesCatalog.all[0]
     }
 }
 private final class EnemyShot {
@@ -116,6 +124,10 @@ final class GameScene: SKScene {
     private var deployMode: DeployMode = .sm5
     private var listenBurstTimer: CGFloat = 0
     private var listenCooldown: CGFloat = 0
+    private var listenRecentTimer: CGFloat = 0
+    private var runMission = SurveyMission.random(deployMode: .sm5)
+    private var detectionVouchers: [DetectionVoucher] = []
+    private var spectrogramSeed: UInt64 = 42
 
     // World
     private var enemies: [Enemy] = []
@@ -291,7 +303,13 @@ final class GameScene: SKScene {
         deployMode = model?.deployMode ?? .sm5
         listenBurstTimer = 0
         listenCooldown = 0
+        listenRecentTimer = 0
+        detectionVouchers.removeAll()
+        spectrogramSeed = UInt64.random(in: 1000...99999)
+        runMission = SurveyMission.random(deployMode: deployMode, seed: spectrogramSeed)
+        model?.activeMission = runMission
         model?.spectrogram = nil
+        model?.surveyReport = nil
         let meta = model?.meta
         dmgMult = meta?.damageMult ?? 1
         hp = 100 + (meta?.bonusHp ?? 0); maxHp = hp
@@ -367,6 +385,7 @@ final class GameScene: SKScene {
             if listenBurstTimer <= 0 { model?.spectrogram = nil }
         }
         if listenCooldown > 0 { listenCooldown -= dt }
+        if listenRecentTimer > 0 { listenRecentTimer -= dt }
         if autopilotMovement {
             let casual = casualAutopilot && !playerInvulnerable
             let fleeR = casual ? BalanceEngine.casualAutopilotFleeRadius : 220
@@ -424,12 +443,16 @@ final class GameScene: SKScene {
             publishHUD()
             return
         }
-        if hp <= 0 { die() ; return }
+        if hp <= 0 { endDeployment(aborted: true) ; return }
         publishHUD()
         let sec = Int(runTime)
         if sec != model?.timeSec {
             model?.timeSec = sec
             checkMilestones(sec)
+            if sec >= runMission.transectDurationSec {
+                endDeployment(aborted: false)
+                return
+            }
         }
     }
 
@@ -545,7 +568,10 @@ final class GameScene: SKScene {
             .group([.scale(to: 1.22, duration: 0.9), .fadeAlpha(to: 0.25, duration: 0.9)]),
             .group([.scale(to: 1.0, duration: 0.9), .fadeAlpha(to: 0.55, duration: 0.9)])
         ])))
-        enemies.append(Enemy(node: node, hp: stats.hp, speed: stats.speed, radius: stats.radius, dmg: stats.damage, xp: stats.xp, kind: kind.rawValue))
+        let speciesRoll = spawnUnit()
+        let species = ProjectSpeciesCatalog.pick(archetype: kind.rawValue, roll: speciesRoll)
+        enemies.append(Enemy(node: node, hp: stats.hp, speed: stats.speed, radius: stats.radius,
+                             dmg: stats.damage, xp: stats.xp, kind: kind.rawValue, speciesId: species.id))
     }
 
     private func maybeBoss() {
@@ -555,7 +581,10 @@ final class GameScene: SKScene {
     }
 
     private func spawnBoss() {
-        SpeciesCallSynth.shared.play(species: .endangered, pan: 0, volume: 0.55)
+        let batCall = ProjectSpeciesCatalog.surveySpecies(for:
+            deployMode == .sm5bat ? ProjectSpeciesCatalog.with(id: "hoary_bat")! : ProjectSpeciesCatalog.with(id: "little_brown_bat")!
+        )
+        SpeciesCallSynth.shared.play(species: batCall, pan: 0, volume: 0.55)
         SfxPlayer.shared.boss(); Haptics.shared.boss()
         let rareBanner = "⚠ ENDANGERED ULTRASONIC"
         model?.runBanner = rareBanner
@@ -572,7 +601,11 @@ final class GameScene: SKScene {
         let node = SKSpriteNode(color: C.boss, size: CGSize(width: 64, height: 64))
         node.position = pos; node.zRotation = .pi/4; node.zPosition = 6
         addChild(node)
-        enemies.append(Enemy(node: node, hp: stats.hp, speed: stats.speed, radius: stats.radius, dmg: stats.damage, xp: stats.xp, kind: EnemyKind.boss.rawValue))
+        let bat = deployMode == .sm5bat
+            ? ProjectSpeciesCatalog.with(id: "hoary_bat")!
+            : ProjectSpeciesCatalog.with(id: "little_brown_bat")!
+        enemies.append(Enemy(node: node, hp: stats.hp, speed: stats.speed, radius: stats.radius,
+                             dmg: stats.damage, xp: stats.xp, kind: EnemyKind.boss.rawValue, speciesId: bat.id))
     }
 
     private func updateEnemies(_ dt: CGFloat) {
@@ -585,7 +618,7 @@ final class GameScene: SKScene {
             let dx = pPos.x - e.node.position.x, dy = pPos.y - e.node.position.y
             let d = max(1, (dx*dx + dy*dy).squareRoot())
             var visibility = min(1, max(0.1, 1.15 - d / detectR))
-            if e.kind == SurveySpecies.endangered.rawValue {
+            if e.projectSpecies.callBand == .ultrasonic {
                 visibility = min(1, visibility * deployMode.ultrasonicVisibilityBoost)
             }
             e.node.alpha = e.kind == EnemyKind.boss.rawValue ? max(0.35, visibility) : visibility
@@ -656,16 +689,17 @@ final class GameScene: SKScene {
             }
             guard speciesCallCooldown <= 0 else { continue }
 
-            let species = SurveySpecies.from(enemyKind: e.kind)
-            let profile = SpeciesCallProfiles.profile(for: species)
+            let project = e.projectSpecies
+            let legacy = ProjectSpeciesCatalog.surveySpecies(for: project)
+            let profile = SpeciesCallProfiles.profile(for: legacy)
             let pan = Float(max(-1, min(1, dx / max(d, 1))))
             let proximity = max(0.15, 1 - d / hearR)
-            let vol = Float(proximity) * (species == .endangered ? 0.62 : 0.48)
-            SpeciesCallSynth.shared.play(species: species, pan: pan, volume: vol)
+            let vol = Float(proximity) * (project.callBand == .ultrasonic ? 0.62 : 0.48)
+            SpeciesCallSynth.shared.play(species: legacy, pan: pan, volume: vol)
 
             let jitter = CGFloat.random(in: 0.75...1.25)
             e.callTimer = profile.callInterval * jitter
-            speciesCallCooldown = species == .endangered ? 0.08 : 0.14
+            speciesCallCooldown = project.callBand == .ultrasonic ? 0.08 : 0.14
         }
     }
 
@@ -848,18 +882,33 @@ final class GameScene: SKScene {
         ]))
     }
     private func kill(_ e: Enemy) {
-        let species = SurveySpecies.from(enemyKind: e.kind)
+        let project = e.projectSpecies
+        let legacy = ProjectSpeciesCatalog.surveySpecies(for: project)
+        let validated = e.kind != 3 || listenRecentTimer > 0
+        let confidence = SurveyScoreEngine.confidence(for: e.kind, listenBurstRecently: listenRecentTimer > 0)
         e.node.removeFromParent()
         if let idx = enemies.firstIndex(where: { $0 === e }) { enemies.remove(at: idx) }
         kills += 1; model?.kills = kills
-        if runTime < CGFloat(BalanceEngine.bossTeaseSeconds) || runTime >= BalanceEngine.bossSpawnSeconds {
-            showRunBanner("ID: \(species.displayName)", pulse: false, duration: 1.2)
-        }
+        let voucher = DetectionVoucher(
+            id: "v-\(kills)-\(Int(runTime))",
+            speciesId: project.id,
+            commonName: project.commonName,
+            scientificName: project.scientificName,
+            confidence: confidence,
+            timeSec: Int(runTime),
+            validated: validated
+        )
+        detectionVouchers.append(voucher)
+        model?.speciesRichness = Set(detectionVouchers.map(\.speciesId)).count
+        showRunBanner(
+            validated ? "Detection: \(project.commonName)" : "Tentative: \(project.commonName)",
+            pulse: false, duration: 1.2
+        )
         checkKillStreak(kills)
         let leech = CGFloat(leechLevel) * 5 + leechPerKill * 1.25
         if leech > 0 { hp = min(maxHp, hp + leech) }
-        model?.catalog.record(species)
-        SpeciesCallSynth.shared.playConfirm(species: species)
+        model?.catalog.record(project)
+        SpeciesCallSynth.shared.playConfirm(species: legacy)
         SfxPlayer.shared.kill(); Haptics.shared.kill()
         burst(at: e.node.position, color: e.node.color)
         dropGem(at: e.node.position, value: e.xp)
@@ -911,24 +960,34 @@ final class GameScene: SKScene {
         cam.run(.sequence([.move(by: CGVector(dx: 6, dy: 0), duration: 0.03), .move(by: CGVector(dx: -10, dy: 0), duration: 0.05), .move(by: CGVector(dx: 4, dy: 0), duration: 0.03)]))
     }
 
-    private func die() {
+    private func endDeployment(aborted: Bool) {
+        guard model?.phase == .playing else { return }
         let t = Int(runTime.rounded())
         model?.timeSec = t
         model?.kills = kills
         model?.level = level
+        let report = SurveyScoreEngine.compute(
+            mission: runMission, timeSec: t, vouchers: detectionVouchers, aborted: aborted
+        )
+        model?.surveyReport = report
         model?.coresEarned = MetaStore.coresForRun(kills: kills, timeSec: t)
-        let newBest = model?.meta.awardRun(kills: kills, timeSec: t) == true
-        model?.runWasNewBest = newBest
-        let lines = EngagementCopy.deathLines(timeSec: t, kills: kills, level: level, isNewBest: newBest)
+        model?.meta.awardRun(kills: kills, timeSec: t)
+        let newScore = model?.meta.awardSurveyScore(report.surveyScore) == true
+        model?.surveyScoreBest = newScore
+        model?.runWasNewBest = newScore
+        let lines = EngagementCopy.deathLines(report: report, isNewBestScore: newScore)
         model?.deathHeadline = lines.headline
         model?.deathSubline = lines.subline
-        if GameCenterLogic.shouldSubmitLeaderboard(newBest: newBest, seconds: t) {
-            Task { @MainActor in
-                GameCenterManager.shared.submitBestTime(t)
-            }
+        if GameCenterLogic.shouldSubmitLeaderboard(newBest: t > (model?.bestTime ?? 0), seconds: t) {
+            Task { @MainActor in GameCenterManager.shared.submitBestTime(t) }
         }
-        SfxPlayer.shared.death(); Haptics.shared.death()
+        if aborted {
+            SfxPlayer.shared.death(); Haptics.shared.death()
+        } else {
+            SfxPlayer.shared.levelUp(); Haptics.shared.levelUp()
+        }
         model?.phase = .dead
+        model?.activeMission = nil
         sticking = false; moveDir = .zero; stickBase.isHidden = true; stickKnob.isHidden = true
     }
 
@@ -964,31 +1023,34 @@ final class GameScene: SKScene {
         guard model?.phase == .playing, listenCooldown <= 0 else { return }
         listenBurstTimer = 1.35
         listenCooldown = 2.75
+        listenRecentTimer = 2.2
         let detectR = BalanceEngine.detectionRadius(
             pickupRadius: pickupRadius, orbitLevel: orbitLevel, chainLevel: chainLevel,
             deployMode: deployMode, listenBurstActive: true
         )
         let hearR = BalanceEngine.hearRadius(detectionRadius: detectR)
-        var nearby: [SurveySpecies] = []
+        var nearby: [ProjectSpecies] = []
         var nearest: Enemy?
         var nearestD = CGFloat.greatestFiniteMagnitude
         for e in enemies {
             let dx = e.node.position.x - pPos.x, dy = e.node.position.y - pPos.y
             let d = (dx * dx + dy * dy).squareRoot()
             guard d <= hearR else { continue }
-            let species = SurveySpecies.from(enemyKind: e.kind)
-            nearby.append(species)
+            nearby.append(e.projectSpecies)
             if d < nearestD {
                 nearestD = d
                 nearest = e
             }
         }
-        model?.spectrogram = SpectrogramBuilder.snapshot(nearby: nearby, deployMode: deployMode)
+        spectrogramSeed &+= 17
+        model?.spectrogram = SpectrogramBuilder.snapshot(
+            nearby: nearby, deployMode: deployMode, seed: spectrogramSeed
+        )
         if let e = nearest {
             let dx = e.node.position.x - pPos.x
             let pan = Float(max(-1, min(1, dx / max(nearestD, 1))))
             SpeciesCallSynth.shared.play(
-                species: SurveySpecies.from(enemyKind: e.kind),
+                species: ProjectSpeciesCatalog.surveySpecies(for: e.projectSpecies),
                 pan: pan,
                 volume: 0.58
             )
@@ -1004,8 +1066,9 @@ final class GameScene: SKScene {
         let sec = Int(runTime)
         model?.nextGoalHint = BalanceEngine.nextGoalHint(timeSec: sec, kills: kills)
         timeLabel.text = String(format: "%d:%02d", sec / 60, sec % 60)
-        killLabel.text = "\(kills) IDs"
-        lvlLabel.text = "RANK \(level)"
+        killLabel.text = "\(kills) detections · \(model?.speciesRichness ?? 0) spp"
+        lvlLabel.text = "RANK \(level) · \(SurveyProtocolCopy.noiseBudgetLabel) \(model?.noiseBudgetPct ?? 100)%"
+        model?.noiseBudgetPct = max(0, Int((hp / max(maxHp, 1) * 100).rounded()))
         layoutHUD()
     }
 
@@ -1137,8 +1200,9 @@ extension GameScene {
         node.position = pPos
         node.zPosition = 2
         addChild(node)
+        let species = ProjectSpeciesCatalog.pick(archetype: kind.rawValue, roll: 0.3)
         enemies.append(Enemy(node: node, hp: stats.hp, speed: stats.speed, radius: stats.radius,
-                           dmg: stats.damage, xp: stats.xp, kind: kind.rawValue))
+                           dmg: stats.damage, xp: stats.xp, kind: kind.rawValue, speciesId: species.id))
     }
 
     func testing_placeEnemyShotOnPlayer(damage: CGFloat) {

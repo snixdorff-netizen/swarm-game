@@ -6,7 +6,11 @@ final class ShareCardTests: XCTestCase {
     @MainActor
     func testShareCardRendererProducesImage() {
         let scale: CGFloat = 2.0
-        let payload = DeathSharePayload(timeSec: 90, kills: 42, level: 7, bestTime: 120)
+        let payload = DeathSharePayload(
+            surveyScore: 840, detections: 42, richness: 7,
+            missionTitle: "Dawn Chorus Baseline", missionPassed: true,
+            timeSec: 90, bestSurveyScore: 1200
+        )
         let image = ShareCardRenderer.image(for: payload, scale: scale)
         XCTAssertNotNil(image)
         XCTAssertEqual(image?.size.width ?? 0, 400, accuracy: 1)

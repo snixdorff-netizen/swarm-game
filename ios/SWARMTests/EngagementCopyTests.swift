@@ -2,16 +2,52 @@ import XCTest
 @testable import SWARM
 
 final class EngagementCopyTests: XCTestCase {
-    func testNewBestHeadline() {
-        let lines = EngagementCopy.deathLines(timeSec: 95, kills: 40, level: 8, isNewBest: true)
-        XCTAssertEqual(lines.headline, "NEW SURVEY RECORD")
-        XCTAssertTrue(lines.subline.contains("1:35"))
+    private func sampleReport(
+        timeSec: Int = 95,
+        detections: Int = 40,
+        richness: Int = 8,
+        meanConfidence: CGFloat = 0.75,
+        surveyScore: Int = 1200,
+        missionPassed: Bool = true,
+        abortReason: String? = nil
+    ) -> SurveyRunReport {
+        SurveyRunReport(
+            missionId: "m1",
+            missionTitle: "Dawn Chorus Baseline",
+            timeSec: timeSec,
+            detections: detections,
+            richness: richness,
+            meanConfidence: meanConfidence,
+            falsePositives: 0,
+            surveyScore: surveyScore,
+            missionPassed: missionPassed,
+            abortReason: abortReason,
+            vouchers: []
+        )
     }
 
-    func testShortRunMotivatesGrants() {
-        let lines = EngagementCopy.deathLines(timeSec: 35, kills: 10, level: 3, isNewBest: false)
-        XCTAssertEqual(lines.headline, "BASELINE ESTABLISHED")
-        XCTAssertTrue(lines.subline.lowercased().contains("grant"))
+    func testNewBestScoreHeadline() {
+        let lines = EngagementCopy.deathLines(report: sampleReport(), isNewBestScore: true)
+        XCTAssertEqual(lines.headline, "NEW BEST SURVEY SCORE")
+        XCTAssertTrue(lines.subline.contains("1200"))
+    }
+
+    func testMissionPassedHeadline() {
+        let lines = EngagementCopy.deathLines(report: sampleReport(), isNewBestScore: false)
+        XCTAssertEqual(lines.headline, SurveyProtocolCopy.missionPassed)
+        XCTAssertTrue(lines.subline.contains("Dawn Chorus"))
+    }
+
+    func testAbortHeadline() {
+        let report = sampleReport(missionPassed: false, abortReason: "Noise budget exceeded — deployment aborted")
+        let lines = EngagementCopy.deathLines(report: report, isNewBestScore: false)
+        XCTAssertEqual(lines.headline, SurveyProtocolCopy.deploymentAborted)
+        XCTAssertTrue(lines.subline.contains("Noise budget"))
+    }
+
+    func testShortRunEndsDeployment() {
+        let lines = EngagementCopy.deathLines(report: sampleReport(timeSec: 35, missionPassed: false), isNewBestScore: false)
+        XCTAssertEqual(lines.headline, "DEPLOYMENT ENDED")
     }
 
     func testFirstRunStepsCoverLoop() {

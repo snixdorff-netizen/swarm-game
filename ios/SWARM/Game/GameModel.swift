@@ -37,12 +37,18 @@ final class GameModel: ObservableObject {
     @Published var runWasNewBest: Bool = false
     @Published var deployMode: DeployMode = .sm5
     @Published var spectrogram: SpectrogramSnapshot?
+    @Published var activeMission: SurveyMission?
+    @Published var surveyReport: SurveyRunReport?
+    @Published var noiseBudgetPct: Int = 100
+    @Published var speciesRichness: Int = 0
+    @Published var surveyScoreBest: Bool = false
 
     let meta: MetaStore
     let catalog: SpeciesCatalogStore
     private var cancellables = Set<AnyCancellable>()
 
     var bestTime: Int { meta.bestTime }
+    var bestSurveyScore: Int { meta.bestSurveyScore }
     var cores: Int { meta.cores }
 
     private static let deployModeKey = "swarm_deploy_mode"
@@ -79,7 +85,11 @@ final class GameModel: ObservableObject {
         deathHeadline = "SURVEY ENDED"
         deathSubline = ""
         runWasNewBest = false
+        surveyScoreBest = false
+        surveyReport = nil
         spectrogram = nil
+        speciesRichness = 0
+        noiseBudgetPct = 100
         onStart()
     }
     func listenBurst() { onListenBurst() }

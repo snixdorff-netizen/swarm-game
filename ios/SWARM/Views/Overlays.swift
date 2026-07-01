@@ -60,9 +60,9 @@ struct MenuOverlay: View {
                 Text(AcousticFieldCopy.tagline)
                     .font(SwarmTheme.ui(14, .semibold)).foregroundColor(SwarmTheme.lime.opacity(0.85))
                 HStack(spacing: 16) {
-                    if model.bestTime > 0 {
-                        Text("Best: \(timeStr(model.bestTime))")
-                            .font(SwarmTheme.ui(14)).foregroundColor(SwarmTheme.lime)
+                    if model.bestSurveyScore > 0 {
+                        Text("Best score: \(model.bestSurveyScore)")
+                            .font(SwarmTheme.ui(14, .bold)).foregroundColor(SwarmTheme.lime)
                     }
                     Text("\(model.cores) \(AcousticFieldCopy.grantsLabel)")
                         .font(SwarmTheme.ui(14, .bold)).foregroundColor(SwarmTheme.cyan)
@@ -184,49 +184,79 @@ struct GameOverOverlay: View {
     @State private var showShare = false
     @State private var shareFailed = false
 
+    private var report: SurveyRunReport? { model.surveyReport }
+
     private var sharePayload: DeathSharePayload {
         DeathSharePayload(
+            surveyScore: report?.surveyScore ?? 0,
+            detections: report?.detections ?? model.kills,
+            richness: report?.richness ?? model.speciesRichness,
+            missionTitle: report?.missionTitle,
+            missionPassed: report?.missionPassed ?? false,
             timeSec: model.timeSec,
-            kills: model.kills,
-            level: model.level,
-            bestTime: model.bestTime
+            bestSurveyScore: model.bestSurveyScore
         )
     }
 
     var body: some View {
         ZStack {
             SwarmTheme.bg.opacity(0.9).ignoresSafeArea()
-            VStack(spacing: 8) {
-                Spacer()
-                Text(model.deathHeadline)
-                    .font(SwarmTheme.title(model.runWasNewBest ? 46 : 52))
-                    .foregroundColor(model.runWasNewBest ? SwarmTheme.lime : SwarmTheme.red)
-                    .shadow(color: (model.runWasNewBest ? SwarmTheme.lime : SwarmTheme.red).opacity(0.6), radius: 16)
-                Text("Deployed \(timeStr(model.timeSec))")
-                    .font(SwarmTheme.ui(22, .bold)).foregroundColor(SwarmTheme.foam).padding(.top, 6)
-                if !model.deathSubline.isEmpty {
-                    Text(model.deathSubline)
-                        .font(SwarmTheme.ui(14))
-                        .foregroundColor(SwarmTheme.foam.opacity(0.65))
+            ScrollView {
+                VStack(spacing: 8) {
+                    Spacer(minLength: 24)
+                    Text(model.deathHeadline)
+                        .font(SwarmTheme.title(model.runWasNewBest ? 40 : 46))
+                        .foregroundColor(model.runWasNewBest ? SwarmTheme.lime : SwarmTheme.red)
+                        .shadow(color: (model.runWasNewBest ? SwarmTheme.lime : SwarmTheme.red).opacity(0.6), radius: 16)
                         .multilineTextAlignment(.center)
-                        .padding(.horizontal, 28)
-                        .padding(.top, 4)
+
+                    if let report {
+                        missionStatusBadge(report)
+                        Text(report.missionTitle)
+                            .font(SwarmTheme.ui(15, .bold))
+                            .foregroundColor(SwarmTheme.cyan)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, 24)
+                    }
+
+                    Text("Transect \(timeStr(model.timeSec))")
+                        .font(SwarmTheme.ui(18, .bold)).foregroundColor(SwarmTheme.foam).padding(.top, 4)
+
+                    if !model.deathSubline.isEmpty {
+                        Text(model.deathSubline)
+                            .font(SwarmTheme.ui(13))
+                            .foregroundColor(SwarmTheme.foam.opacity(0.65))
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, 28)
+                            .padding(.top, 2)
+                    }
+
+                    HStack(spacing: 18) {
+                        stat("\(report?.surveyScore ?? 0)", "survey score")
+                        stat("\(report?.detections ?? model.kills)", SurveyProtocolCopy.detectionsLabel.lowercased())
+                        stat("\(report?.richness ?? model.speciesRichness)", "species")
+                    }.padding(.top, 12)
+
+                    if let report, !report.vouchers.isEmpty {
+                        voucherList(report.vouchers)
+                            .padding(.horizontal, 28)
+                            .padding(.top, 8)
+                    }
+
+                    if model.coresEarned > 0 {
+                        Text("+\(model.coresEarned) survey grants")
+                            .font(SwarmTheme.ui(15, .bold)).foregroundColor(SwarmTheme.cyan).padding(.top, 6)
+                    }
+
+                    VStack(spacing: 12) {
+                        Button("Deploy again") { model.start() }.buttonStyle(NeonButton(tint: SwarmTheme.cyan))
+                        Button("Share") { presentShare() }.buttonStyle(NeonButton(tint: SwarmTheme.lime))
+                        Button("Menu") { model.restart() }.buttonStyle(NeonButton(tint: Color(white: 0.3)))
+                    }
+                    .padding(.horizontal, 36)
+                    .padding(.top, 16)
+                    .padding(.bottom, 48)
                 }
-                HStack(spacing: 22) {
-                    stat("\(model.kills)", "confirmed")
-                    stat("RANK \(model.level)", "reached")
-                    stat(timeStr(model.bestTime), "best")
-                }.padding(.top, 14)
-                if model.coresEarned > 0 {
-                    Text("+\(model.coresEarned) survey grants")
-                        .font(SwarmTheme.ui(16, .bold)).foregroundColor(SwarmTheme.cyan).padding(.top, 6)
-                }
-                Spacer()
-                VStack(spacing: 12) {
-                    Button("Deploy again") { model.start() }.buttonStyle(NeonButton(tint: SwarmTheme.cyan))
-                    Button("Share") { presentShare() }.buttonStyle(NeonButton(tint: SwarmTheme.lime))
-                    Button("Menu") { model.restart() }.buttonStyle(NeonButton(tint: Color(white: 0.3)))
-                }.padding(.horizontal, 36).padding(.bottom, 48)
             }
         }
         .onAppear { cacheShareImage() }
@@ -238,6 +268,51 @@ struct GameOverOverlay: View {
         .alert("Couldn't create share image", isPresented: $shareFailed) {
             Button("OK", role: .cancel) {}
         }
+    }
+
+    @ViewBuilder
+    private func missionStatusBadge(_ report: SurveyRunReport) -> some View {
+        let passed = report.missionPassed
+        let label = report.abortReason != nil
+            ? SurveyProtocolCopy.deploymentAborted
+            : (passed ? SurveyProtocolCopy.missionPassed : SurveyProtocolCopy.missionIncomplete)
+        Text(label)
+            .font(SwarmTheme.ui(11, .bold))
+            .foregroundColor(.black)
+            .padding(.horizontal, 12).padding(.vertical, 5)
+            .background(passed ? SwarmTheme.lime : SwarmTheme.red.opacity(0.85))
+            .clipShape(Capsule())
+            .padding(.top, 6)
+    }
+
+    private func voucherList(_ vouchers: [DetectionVoucher]) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Detection vouchers")
+                .font(SwarmTheme.ui(11, .bold))
+                .foregroundColor(SwarmTheme.foam.opacity(0.55))
+            ForEach(vouchers.suffix(6)) { v in
+                HStack(spacing: 8) {
+                    Image(systemName: v.validated ? "checkmark.seal.fill" : "questionmark.circle")
+                        .font(.system(size: 12))
+                        .foregroundColor(v.validated ? SwarmTheme.lime : SwarmTheme.foam.opacity(0.4))
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(v.commonName)
+                            .font(SwarmTheme.ui(12, .semibold))
+                            .foregroundColor(SwarmTheme.foam)
+                        Text(v.scientificName)
+                            .font(.system(size: 10, weight: .medium, design: .serif))
+                            .italic()
+                            .foregroundColor(SwarmTheme.foam.opacity(0.5))
+                    }
+                    Spacer()
+                    Text("\(Int(v.confidence * 100))%")
+                        .font(SwarmTheme.ui(11, .bold))
+                        .foregroundColor(SwarmTheme.cyan.opacity(0.8))
+                }
+            }
+        }
+        .padding(12)
+        .background(RoundedRectangle(cornerRadius: 12).fill(Color(white: 0.08)))
     }
 
     private func cacheShareImage() {
@@ -475,12 +550,16 @@ struct CatalogOverlay: View {
             Image(systemName: entry.discovered ? "checkmark.circle.fill" : "circle.dashed")
                 .foregroundColor(entry.discovered ? SwarmTheme.lime : SwarmTheme.foam.opacity(0.35))
             VStack(alignment: .leading, spacing: 2) {
-                Text(entry.species.displayName)
+                Text(entry.species.commonName)
                     .font(SwarmTheme.ui(15, .bold))
                     .foregroundColor(entry.discovered ? SwarmTheme.foam : SwarmTheme.foam.opacity(0.45))
+                Text(entry.species.scientificName)
+                    .font(.system(size: 11, weight: .medium, design: .serif))
+                    .italic()
+                    .foregroundColor(SwarmTheme.foam.opacity(entry.discovered ? 0.55 : 0.35))
                 Text(entry.species.bandLabel)
-                    .font(SwarmTheme.ui(11))
-                    .foregroundColor(SwarmTheme.foam.opacity(0.5))
+                    .font(SwarmTheme.ui(10))
+                    .foregroundColor(SwarmTheme.foam.opacity(0.45))
             }
             Spacer()
             Text(entry.discovered ? "\(entry.count)×" : "—")
@@ -498,6 +577,16 @@ struct PlayingFieldOverlay: View {
     var body: some View {
         ZStack {
             VStack {
+                if let mission = model.activeMission {
+                    MissionBriefCard(
+                        mission: mission,
+                        detections: model.kills,
+                        richness: model.speciesRichness,
+                        noiseBudgetPct: model.noiseBudgetPct
+                    )
+                    .padding(.horizontal, 16)
+                    .padding(.top, 52)
+                }
                 HStack {
                     Spacer()
                     Button {
@@ -513,7 +602,7 @@ struct PlayingFieldOverlay: View {
                             .shadow(color: SwarmTheme.cyan.opacity(0.5), radius: 8)
                     }
                     .padding(.trailing, 16)
-                    .padding(.top, 52)
+                    .padding(.top, model.activeMission == nil ? 52 : 8)
                 }
                 if let spec = model.spectrogram {
                     SpectrogramStripView(snapshot: spec)
@@ -538,6 +627,54 @@ struct PlayingFieldOverlay: View {
     }
 }
 
+private struct MissionBriefCard: View {
+    let mission: SurveyMission
+    let detections: Int
+    let richness: Int
+    let noiseBudgetPct: Int
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text("MISSION BRIEF")
+                    .font(SwarmTheme.ui(10, .bold))
+                    .foregroundColor(SwarmTheme.lime)
+                Spacer()
+                Text(timeStr(mission.transectDurationSec))
+                    .font(SwarmTheme.ui(10, .bold))
+                    .foregroundColor(SwarmTheme.cyan.opacity(0.75))
+            }
+            Text(mission.title)
+                .font(SwarmTheme.ui(14, .bold))
+                .foregroundColor(SwarmTheme.foam)
+            Text(mission.hypothesis)
+                .font(SwarmTheme.ui(11))
+                .foregroundColor(SwarmTheme.foam.opacity(0.6))
+                .lineLimit(2)
+            HStack(spacing: 12) {
+                briefStat("\(detections)/\(mission.targetDetections)", "detections")
+                briefStat("\(richness)/\(mission.targetRichness)", "species")
+                briefStat("\(noiseBudgetPct)%", "noise budget")
+            }
+            .padding(.top, 2)
+        }
+        .padding(12)
+        .background(RoundedRectangle(cornerRadius: 14).fill(Color.black.opacity(0.55)))
+        .overlay(RoundedRectangle(cornerRadius: 14).stroke(SwarmTheme.lime.opacity(0.3), lineWidth: 1))
+    }
+
+    private func briefStat(_ value: String, _ label: String) -> some View {
+        VStack(alignment: .leading, spacing: 1) {
+            Text(value)
+                .font(SwarmTheme.ui(12, .bold))
+                .foregroundColor(SwarmTheme.cyan)
+            Text(label)
+                .font(SwarmTheme.ui(9))
+                .foregroundColor(SwarmTheme.foam.opacity(0.45))
+        }
+    }
+}
+
 struct SpectrogramStripView: View {
     let snapshot: SpectrogramSnapshot
 
@@ -552,12 +689,15 @@ struct SpectrogramStripView: View {
                     .font(SwarmTheme.ui(10, .bold))
                     .foregroundColor(SwarmTheme.cyan.opacity(0.8))
             }
+            SpectrogramWaterfallView(waterfall: snapshot.waterfall)
+                .frame(height: 72)
+                .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
             HStack(alignment: .bottom, spacing: 8) {
                 ForEach(snapshot.bands) { band in
                     VStack(spacing: 4) {
                         RoundedRectangle(cornerRadius: 3)
                             .fill(SwarmTheme.cyan.opacity(0.25 + Double(band.level) * 0.65))
-                            .frame(width: 28, height: max(8, 56 * band.level))
+                            .frame(width: 28, height: max(8, 40 * band.level))
                         Text(band.label)
                             .font(.system(size: 7, weight: .semibold, design: .monospaced))
                             .foregroundColor(SwarmTheme.foam.opacity(0.55))
@@ -579,6 +719,38 @@ struct SpectrogramStripView: View {
         .padding(12)
         .background(RoundedRectangle(cornerRadius: 14).fill(Color.black.opacity(0.62)))
         .overlay(RoundedRectangle(cornerRadius: 14).stroke(SwarmTheme.cyan.opacity(0.35), lineWidth: 1))
+    }
+}
+
+struct SpectrogramWaterfallView: View {
+    let waterfall: SpectrogramWaterfall
+
+    var body: some View {
+        Canvas { context, size in
+            let tN = waterfall.timeSteps
+            let fN = waterfall.freqBins
+            guard tN > 0, fN > 0 else { return }
+            let cellW = size.width / CGFloat(tN)
+            let cellH = size.height / CGFloat(fN)
+
+            for row in 0..<fN {
+                for col in 0..<tN {
+                    let idx = row * tN + col
+                    guard idx < waterfall.energy.count else { continue }
+                    let e = CGFloat(waterfall.energy[idx])
+                    let rect = CGRect(
+                        x: CGFloat(col) * cellW,
+                        y: size.height - CGFloat(row + 1) * cellH,
+                        width: max(1, cellW),
+                        height: max(1, cellH)
+                    )
+                    let hue = 0.52 - Double(row) / Double(fN) * 0.18
+                    let color = Color(hue: hue, saturation: 0.75, brightness: 0.12 + Double(e) * 0.88)
+                    context.fill(Path(rect), with: .color(color))
+                }
+            }
+        }
+        .background(Color(red: 0.02, green: 0.03, blue: 0.06))
     }
 }
 

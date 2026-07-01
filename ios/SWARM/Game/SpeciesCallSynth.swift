@@ -4,7 +4,7 @@
 import AVFoundation
 import Foundation
 
-enum CallBand: String, Equatable {
+enum CallBand: String, Equatable, Codable {
     case acoustic
     case ultrasonic
 }

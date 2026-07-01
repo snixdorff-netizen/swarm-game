@@ -1,30 +1,30 @@
-// Player-facing motivation copy — Wildlife Acoustics–style field survey tone.
+// Player-facing motivation copy — survey protocol tone.
 
 import Foundation
 
 enum EngagementCopy {
-    static func deathLines(timeSec: Int, kills: Int, level: Int, isNewBest: Bool) -> (headline: String, subline: String) {
-        if isNewBest {
-            return ("NEW SURVEY RECORD", "Longest deployment \(formatTime(timeSec)) — catalog updated.")
+    static func deathLines(report: SurveyRunReport, isNewBestScore: Bool) -> (headline: String, subline: String) {
+        if report.abortReason != nil {
+            return (
+                SurveyProtocolCopy.deploymentAborted,
+                report.abortReason! + " · Score \(report.surveyScore) · " + report.scoreBreakdown
+            )
         }
-        if timeSec >= 90 {
-            return ("ENDANGERED SIGNAL LOGGED", "You reached \(timeStr(timeSec)) and triggered the rare ultrasonic event. Deploy again.")
+        if report.missionPassed {
+            let head = isNewBestScore ? "NEW BEST SURVEY SCORE" : SurveyProtocolCopy.missionPassed
+            return (head, "\(report.missionTitle) · Score \(report.surveyScore) · " + report.scoreBreakdown)
         }
-        if timeSec >= 60 {
-            return ("STRONG INVENTORY", "\(kills) confirmed IDs · Rank \(level). Habitat activity rising.")
+        if report.timeSec >= 420 {
+            return (
+                SurveyProtocolCopy.transectComplete,
+                SurveyProtocolCopy.missionIncomplete + " · Score \(report.surveyScore) · " + report.scoreBreakdown
+            )
         }
-        if timeSec >= 30 {
-            return ("BASELINE ESTABLISHED", "+\(MetaStore.coresForRun(kills: kills, timeSec: timeSec)) survey grants ready. Visit Field Lab.")
-        }
-        if kills >= 20 {
-            return ("SHORT DEPLOYMENT", "\(kills) IDs logged. Sweep wider — collect more recording clips.")
-        }
-        return ("SURVEY ENDED", "Move quietly · gather green recording clips · tune your classifier kit.")
+        return (
+            "DEPLOYMENT ENDED",
+            "Score \(report.surveyScore) · " + report.scoreBreakdown
+        )
     }
 
     static let firstRunSteps = AcousticFieldCopy.firstRunSteps
-}
-
-private func formatTime(_ s: Int) -> String {
-    String(format: "%d:%02d", s / 60, s % 60)
 }

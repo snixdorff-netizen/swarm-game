@@ -2,17 +2,22 @@ import XCTest
 @testable import SWARM
 
 final class SpectrogramCatalogTests: XCTestCase {
+    private var woodThrush: ProjectSpecies { ProjectSpeciesCatalog.with(id: "wood_thrush")! }
+    private var littleBrownBat: ProjectSpecies { ProjectSpeciesCatalog.with(id: "little_brown_bat")! }
+
     func testSpectrogramMidBandDominatesPasserineSM5() {
-        let snap = SpectrogramBuilder.snapshot(nearby: [.passerine, .passerine], deployMode: .sm5)
+        let snap = SpectrogramBuilder.snapshot(nearby: [woodThrush, woodThrush], deployMode: .sm5)
         let mid = snap.bands.first { $0.id == "mid" }!
         let ultra = snap.bands.first { $0.id == "ultra" }!
         XCTAssertGreaterThan(mid.level, ultra.level)
-        XCTAssertTrue(snap.dominantLabel?.contains("Passerine") == true)
+        XCTAssertTrue(snap.dominantLabel?.contains("Wood Thrush") == true)
+        XCTAssertEqual(snap.waterfall.timeSteps, SpectrogramWaterfall.defaultTimeSteps)
+        XCTAssertEqual(snap.waterfall.energy.count, snap.waterfall.timeSteps * snap.waterfall.freqBins)
     }
 
     func testSpectrogramUltraBoostedOnSM5BAT() {
-        let acoustic = SpectrogramBuilder.snapshot(nearby: [.passerine], deployMode: .sm5bat)
-        let endangered = SpectrogramBuilder.snapshot(nearby: [.endangered], deployMode: .sm5bat)
+        let acoustic = SpectrogramBuilder.snapshot(nearby: [woodThrush], deployMode: .sm5bat)
+        let endangered = SpectrogramBuilder.snapshot(nearby: [littleBrownBat], deployMode: .sm5bat)
         let ultraEndangered = endangered.bands.first { $0.id == "ultra" }!.level
         let ultraAcoustic = acoustic.bands.first { $0.id == "ultra" }!.level
         XCTAssertGreaterThan(ultraEndangered, ultraAcoustic)
@@ -24,14 +29,19 @@ final class SpectrogramCatalogTests: XCTestCase {
         ud.removePersistentDomain(forName: suite)
         let store = SpeciesCatalogStore(defaults: ud)
         XCTAssertEqual(store.discoveredCount, 0)
-        store.record(.swift)
-        store.record(.swift)
-        store.record(.endangered)
-        XCTAssertEqual(store.count(for: .swift), 2)
+        store.record(woodThrush)
+        store.record(woodThrush)
+        store.record(littleBrownBat)
+        XCTAssertEqual(store.count(for: woodThrush), 2)
         XCTAssertEqual(store.discoveredCount, 2)
         let reloaded = SpeciesCatalogStore(defaults: ud)
-        XCTAssertEqual(reloaded.count(for: .swift), 2)
-        XCTAssertEqual(reloaded.count(for: .endangered), 1)
+        XCTAssertEqual(reloaded.count(for: woodThrush), 2)
+        XCTAssertEqual(reloaded.count(for: littleBrownBat), 1)
+    }
+
+    func testProjectSpeciesCatalogHasTwelveEntries() {
+        XCTAssertEqual(ProjectSpeciesCatalog.all.count, 12)
+        XCTAssertTrue(ProjectSpeciesCatalog.all.allSatisfy { !$0.scientificName.isEmpty })
     }
 
     func testSM5HasWiderAcousticDetectThanSM5BAT() {

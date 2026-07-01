@@ -1,0 +1,58 @@
+import XCTest
+@testable import SWARM
+
+final class SurveyMissionTests: XCTestCase {
+    func testRandomMissionIsDeterministicWithSeed() {
+        let a = SurveyMission.random(deployMode: .sm5, seed: 42)
+        let b = SurveyMission.random(deployMode: .sm5, seed: 42)
+        XCTAssertEqual(a, b)
+    }
+
+    func testSM5BATMissionsDifferFromSM5() {
+        let sm5 = SurveyMission.random(deployMode: .sm5, seed: 7)
+        let bat = SurveyMission.random(deployMode: .sm5bat, seed: 7)
+        XCTAssertNotEqual(sm5.title, bat.title)
+    }
+
+    func testSurveyScoreEngineMissionPass() {
+        let mission = SurveyMission(
+            id: "t", title: "Test", hypothesis: "H",
+            targetDetections: 5, targetRichness: 2, minMeanConfidence: 0.6, transectDurationSec: 480
+        )
+        let vouchers = [
+            DetectionVoucher(id: "v1", speciesId: "wood_thrush", commonName: "Wood Thrush",
+                             scientificName: "Hylocichla mustelina", confidence: 0.72, timeSec: 60, validated: true),
+            DetectionVoucher(id: "v2", speciesId: "ovenbird", commonName: "Ovenbird",
+                             scientificName: "Seiurus aurocapilla", confidence: 0.68, timeSec: 90, validated: true),
+            DetectionVoucher(id: "v3", speciesId: "wood_thrush", commonName: "Wood Thrush",
+                             scientificName: "Hylocichla mustelina", confidence: 0.70, timeSec: 120, validated: true),
+            DetectionVoucher(id: "v4", speciesId: "bullfrog", commonName: "American Bullfrog",
+                             scientificName: "Lithobates catesbeianus", confidence: 0.75, timeSec: 150, validated: true),
+            DetectionVoucher(id: "v5", speciesId: "barred_owl", commonName: "Barred Owl",
+                             scientificName: "Strix varia", confidence: 0.71, timeSec: 180, validated: true),
+        ]
+        let report = SurveyScoreEngine.compute(mission: mission, timeSec: 200, vouchers: vouchers, aborted: false)
+        XCTAssertTrue(report.missionPassed)
+        XCTAssertGreaterThan(report.surveyScore, 0)
+        XCTAssertEqual(report.richness, 4)
+        XCTAssertEqual(report.detections, 5)
+    }
+
+    func testSurveyScoreEngineAbortPenalty() {
+        let mission = SurveyMission.random(deployMode: .sm5, seed: 1)
+        let vouchers = [
+            DetectionVoucher(id: "v1", speciesId: "wood_thrush", commonName: "Wood Thrush",
+                             scientificName: "Hylocichla mustelina", confidence: 0.8, timeSec: 10, validated: true),
+        ]
+        let ok = SurveyScoreEngine.compute(mission: mission, timeSec: 60, vouchers: vouchers, aborted: false)
+        let aborted = SurveyScoreEngine.compute(mission: mission, timeSec: 60, vouchers: vouchers, aborted: true)
+        XCTAssertNotNil(aborted.abortReason)
+        XCTAssertLessThan(aborted.surveyScore, ok.surveyScore)
+        XCTAssertFalse(aborted.missionPassed)
+    }
+
+    func testMimicConfidenceRequiresListenBurst() {
+        XCTAssertLessThan(SurveyScoreEngine.confidence(for: 3, listenBurstRecently: false), 0.5)
+        XCTAssertGreaterThan(SurveyScoreEngine.confidence(for: 3, listenBurstRecently: true), 0.7)
+    }
+}

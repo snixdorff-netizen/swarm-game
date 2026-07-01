@@ -175,6 +175,22 @@ final class MetaStoreTests: XCTestCase {
         XCTAssertEqual(store.leechPerKill, 1, accuracy: 0.0001)
     }
 
+    func testAwardSurveyScoreUpdatesBest() {
+        XCTAssertTrue(store.awardSurveyScore(500))
+        XCTAssertEqual(store.bestSurveyScore, 500)
+
+        XCTAssertFalse(store.awardSurveyScore(400))
+        XCTAssertEqual(store.bestSurveyScore, 500)
+
+        XCTAssertTrue(store.awardSurveyScore(900))
+        XCTAssertEqual(store.bestSurveyScore, 900)
+    }
+
+    func testBestSurveyScorePersistsAcrossInstances() {
+        store.awardSurveyScore(1337)
+        XCTAssertEqual(reloadStore().bestSurveyScore, 1337)
+    }
+
     func testCanBuyEachCatalogEntry() {
         store.awardRun(kills: 500, timeSec: 600)
         for up in MetaCatalog.all {

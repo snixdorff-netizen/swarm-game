@@ -31,17 +31,20 @@ enum MetaCatalog {
 final class MetaStore: ObservableObject {
     @Published private(set) var cores: Int
     @Published private(set) var bestTime: Int
+    @Published private(set) var bestSurveyScore: Int
     @Published private(set) var levels: [String: Int]
 
     private let ud: UserDefaults
     private let coresKey = "swarm_cores"
     private let bestKey = "swarm_best"
+    private let bestScoreKey = "swarm_best_survey_score"
     private let levelsKey = "swarm_meta_levels"
 
     init(defaults: UserDefaults = .standard) {
         ud = defaults
         cores = ud.integer(forKey: coresKey)
         bestTime = ud.integer(forKey: bestKey)
+        bestSurveyScore = ud.integer(forKey: bestScoreKey)
         levels = (ud.dictionary(forKey: levelsKey) as? [String: Int]) ?? [:]
     }
 
@@ -78,6 +81,14 @@ final class MetaStore: ObservableObject {
         return newBest
     }
 
+    @discardableResult
+    func awardSurveyScore(_ score: Int) -> Bool {
+        let newBest = score > bestSurveyScore
+        if newBest { bestSurveyScore = score }
+        persist()
+        return newBest
+    }
+
     var damageMult: CGFloat { 1 + CGFloat(level(for: "meta_dmg")) * 0.04 }
     var bonusHp: CGFloat { CGFloat(level(for: "meta_hp")) * 8 }
     var speedMult: CGFloat { 1 + CGFloat(level(for: "meta_speed")) * 0.03 }
@@ -88,6 +99,7 @@ final class MetaStore: ObservableObject {
     private func persist() {
         ud.set(cores, forKey: coresKey)
         ud.set(bestTime, forKey: bestKey)
+        ud.set(bestSurveyScore, forKey: bestScoreKey)
         ud.set(levels, forKey: levelsKey)
     }
 }
