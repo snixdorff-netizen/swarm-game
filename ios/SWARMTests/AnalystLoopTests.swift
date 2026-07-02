@@ -127,19 +127,56 @@ final class AnalystLoopTests: XCTestCase {
             ),
         ]
         vouchers[0] = vouchers[0].withVetStatus(.confirmed)
-        let next = VetQueueEngine.advanceAfterDecision(vouchers: vouchers, decidedId: "v1", decision: .confirmed)
+        let next = VetQueueEngine.advanceAfterDecision(
+            vouchers: vouchers, decidedId: "v1", decision: .confirmed, decidedIndex: 0
+        )
         XCTAssertEqual(next?.voucherId, "v2")
         XCTAssertEqual(next?.queueLabel, "Clip 1 of 2")
         vouchers[1] = vouchers[1].withVetStatus(.rejected)
-        let afterReject = VetQueueEngine.advanceAfterDecision(vouchers: vouchers, decidedId: "v2", decision: .rejected)
+        let afterReject = VetQueueEngine.advanceAfterDecision(
+            vouchers: vouchers, decidedId: "v2", decision: .rejected, decidedIndex: 0
+        )
         XCTAssertEqual(afterReject?.voucherId, "v3")
+    }
+
+    func testDeferThenResolveAdvancesFromNonHeadPosition() {
+        let vouchers = [
+            DetectionVoucher(
+                id: "v1", speciesId: "a", commonName: "A", scientificName: "S. a",
+                confidence: 0.6, timeSec: 10, vetStatus: .needsReview,
+                deploymentId: "DEP", siteLabel: "Site", recorderProfile: "SM5", clipFilename: "a.wav"
+            ),
+            DetectionVoucher(
+                id: "v2", speciesId: "b", commonName: "B", scientificName: "S. b",
+                confidence: 0.55, timeSec: 20, vetStatus: .needsReview,
+                deploymentId: "DEP", siteLabel: "Site", recorderProfile: "SM5", clipFilename: "b.wav"
+            ),
+            DetectionVoucher(
+                id: "v3", speciesId: "c", commonName: "C", scientificName: "S. c",
+                confidence: 0.5, timeSec: 30, vetStatus: .needsReview,
+                deploymentId: "DEP", siteLabel: "Site", recorderProfile: "SM5", clipFilename: "c.wav"
+            ),
+        ]
+        let deferred = VetQueueEngine.advanceAfterDecision(
+            vouchers: vouchers, decidedId: "v1", decision: .needsReview, decidedIndex: 0
+        )
+        XCTAssertEqual(deferred?.voucherId, "v2")
+        var resolved = vouchers
+        resolved[1] = resolved[1].withVetStatus(.confirmed)
+        let afterConfirm = VetQueueEngine.advanceAfterDecision(
+            vouchers: resolved, decidedId: "v2", decision: .confirmed, decidedIndex: 1
+        )
+        XCTAssertEqual(afterConfirm?.voucherId, "v3")
+        XCTAssertNotEqual(afterConfirm?.voucherId, "v1")
     }
 
     func testEmptyQueueDismissesSession() {
         let vouchers = [voucher(speciesId: "a", vetStatus: .confirmed)]
         XCTAssertNil(VetQueueEngine.session(at: 0, in: vouchers))
         XCTAssertEqual(VetQueueEngine.backlogCount(vouchers), 0)
-        XCTAssertNil(VetQueueEngine.advanceAfterDecision(vouchers: vouchers, decidedId: "v-a-confirmed", decision: .confirmed))
+        XCTAssertNil(VetQueueEngine.advanceAfterDecision(
+            vouchers: vouchers, decidedId: "v-a-confirmed", decision: .confirmed, decidedIndex: 0
+        ))
     }
 
     func testRichnessCountsValidatedPresenceOnly() {

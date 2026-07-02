@@ -1035,11 +1035,16 @@ final class GameScene: SKScene {
     func applyVetDecision(voucherId: String, decision: VetStatus) {
         guard let idx = detectionVouchers.firstIndex(where: { $0.id == voucherId }) else { return }
         let prior = detectionVouchers[idx]
+        let priorPending = VetQueueEngine.orderedPending(detectionVouchers)
+        let decidedIndex = priorPending.firstIndex(where: { $0.id == voucherId }) ?? 0
         detectionVouchers[idx] = prior.withVetStatus(decision)
         model?.recentVouchers = Array(detectionVouchers.suffix(3))
         refreshSpeciesRichness()
         model?.vetSession = VetQueueEngine.advanceAfterDecision(
-            vouchers: detectionVouchers, decidedId: voucherId, decision: decision
+            vouchers: detectionVouchers,
+            decidedId: voucherId,
+            decision: decision,
+            decidedIndex: decidedIndex
         )
         model?.vetBacklogCount = VetQueueEngine.backlogCount(detectionVouchers)
         if model?.vetSession != nil {

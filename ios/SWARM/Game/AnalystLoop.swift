@@ -84,22 +84,22 @@ enum VetQueueEngine {
     }
 
     /// After a vet decision, return the next analyst session or nil when the queue is empty.
+    /// `decidedIndex` is the voucher's position in the pending queue *before* the decision was applied.
     static func advanceAfterDecision(
         vouchers: [DetectionVoucher],
         decidedId: String,
-        decision: VetStatus
+        decision: VetStatus,
+        decidedIndex: Int
     ) -> VetSession? {
         let pending = orderedPending(vouchers)
         guard !pending.isEmpty else { return nil }
         switch decision {
         case .confirmed, .rejected:
-            return session(at: 0, in: vouchers)
+            let nextIdx = decidedIndex < pending.count ? decidedIndex : 0
+            return session(at: nextIdx, in: vouchers)
         case .needsReview:
-            guard let idx = pending.firstIndex(where: { $0.id == decidedId }) else {
-                return session(at: 0, in: vouchers)
-            }
             if pending.count == 1 { return session(for: decidedId, in: vouchers) }
-            return session(at: (idx + 1) % pending.count, in: vouchers)
+            return session(at: (decidedIndex + 1) % pending.count, in: vouchers)
         case .autoAccepted:
             return session(at: 0, in: vouchers)
         }
