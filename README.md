@@ -77,6 +77,11 @@ cd ios && xcodebuild test -project SWARM.xcodeproj -scheme SWARM -sdk iphonesimu
   -destination 'platform=iOS Simulator,name=iPhone 17' CODE_SIGNING_ALLOWED=NO
 ```
 
+P6 verification bundle (build + tests + launch + AC mapping):
+```bash
+GROK_GOAL_SCRATCH=./.verify-scratch scripts/capture-p6-verification.sh
+```
+
 ## Layout
 ```
 ios/SWARM/
