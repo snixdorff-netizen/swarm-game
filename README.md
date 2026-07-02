@@ -19,6 +19,7 @@ Beat your best **survey score**.
 - **P3 trust wave** — voucher metadata (deployment ID, site, recorder, clip filename), coffee-break vs field-day transect toggle, lab board honesty label, README sync.
 - **P4 credibility wave** — combat de-emphasis (no DPS floaters, auto-archived clips, drift-not-chase), passive SM5BAT monitor (stationary rig, crossing passes, emergence window).
 - **P5 analyst loop** — Kaleidoscope-style vet panel (Confirm / Reject / Needs review), presence/absence rollup on game-over, conservative classifier toggle, CSV `auto_id`/`manual_id`/`vet_status` columns.
+- **P6 batch analyst** — sequential vet queue (clip N of M), live analyst backlog on mission brief, presence/absence night-card lab export, configure-step brief (site + recorder + deployment ID).
 - **Meta-progression** — earn survey grants each deployment, spend in Field Lab on permanent rig upgrades.
 
 ## Project species (12)

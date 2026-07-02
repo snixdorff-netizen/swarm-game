@@ -332,6 +332,8 @@ final class GameScene: SKScene {
             deployMode: deployMode, habitat: habitat, transectMode: transect, seed: spectrogramSeed
         )
         model?.deploymentId = deploymentContext.deploymentId
+        model?.siteLabel = deploymentContext.siteLabel
+        model?.recorderProfile = deploymentContext.recorderProfile
         model?.activeMission = runMission
         model?.spectrogram = nil
         model?.surveyReport = nil
@@ -977,8 +979,10 @@ final class GameScene: SKScene {
         refreshSpeciesRichness()
         model?.recentVouchers = Array(detectionVouchers.suffix(3))
         if vetStatus == .needsReview {
-            model?.vetSession = VetSession(voucher: voucher)
-            listenBurstTimer = max(listenBurstTimer, 5.0)
+            syncVetQueue(openNewId: voucher.id)
+            if model?.vetSession != nil {
+                listenBurstTimer = max(listenBurstTimer, 5.0)
+            }
         }
         if !(e.kind == 3 && !listenRecent) {
             showDetectionBanner(detectionBanner(for: project.commonName, status: vetStatus), pulse: false, duration: 1.2)
@@ -1010,13 +1014,37 @@ final class GameScene: SKScene {
         model?.speciesRichness = present
     }
 
+    private func syncVetQueue(openNewId: String? = nil) {
+        let backlog = VetQueueEngine.backlogCount(detectionVouchers)
+        model?.vetBacklogCount = backlog
+        guard backlog > 0 else {
+            model?.vetSession = nil
+            return
+        }
+        if let openNewId, model?.vetSession == nil {
+            model?.vetSession = VetQueueEngine.session(for: openNewId, in: detectionVouchers)
+                ?? VetQueueEngine.session(at: 0, in: detectionVouchers)
+        } else if let currentId = model?.vetSession?.voucherId,
+                  let refreshed = VetQueueEngine.session(for: currentId, in: detectionVouchers) {
+            model?.vetSession = refreshed
+        } else if model?.vetSession == nil {
+            model?.vetSession = VetQueueEngine.session(at: 0, in: detectionVouchers)
+        }
+    }
+
     func applyVetDecision(voucherId: String, decision: VetStatus) {
         guard let idx = detectionVouchers.firstIndex(where: { $0.id == voucherId }) else { return }
         let prior = detectionVouchers[idx]
         detectionVouchers[idx] = prior.withVetStatus(decision)
         model?.recentVouchers = Array(detectionVouchers.suffix(3))
         refreshSpeciesRichness()
-        model?.vetSession = nil
+        model?.vetSession = VetQueueEngine.advanceAfterDecision(
+            vouchers: detectionVouchers, decidedId: voucherId, decision: decision
+        )
+        model?.vetBacklogCount = VetQueueEngine.backlogCount(detectionVouchers)
+        if model?.vetSession != nil {
+            listenBurstTimer = max(listenBurstTimer, 5.0)
+        }
         switch decision {
         case .confirmed:
             showDetectionBanner("Manual ID confirmed: \(prior.commonName)", pulse: false, duration: 1.2)

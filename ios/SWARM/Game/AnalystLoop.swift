@@ -46,13 +46,63 @@ struct VetSession: Equatable {
     let scientificName: String
     let confidence: CGFloat
     let clipFilename: String
+    let queueIndex: Int
+    let queueTotal: Int
 
-    init(voucher: DetectionVoucher) {
+    var queueLabel: String { "Clip \(queueIndex) of \(queueTotal)" }
+
+    init(voucher: DetectionVoucher, queueIndex: Int, queueTotal: Int) {
         voucherId = voucher.id
         commonName = voucher.commonName
         scientificName = voucher.scientificName
         confidence = voucher.confidence
         clipFilename = voucher.clipFilename
+        self.queueIndex = queueIndex
+        self.queueTotal = queueTotal
+    }
+}
+
+enum VetQueueEngine {
+    static func orderedPending(_ vouchers: [DetectionVoucher]) -> [DetectionVoucher] {
+        vouchers.filter { $0.vetStatus == .needsReview }
+    }
+
+    static func backlogCount(_ vouchers: [DetectionVoucher]) -> Int {
+        orderedPending(vouchers).count
+    }
+
+    static func session(for voucherId: String, in vouchers: [DetectionVoucher]) -> VetSession? {
+        let pending = orderedPending(vouchers)
+        guard let idx = pending.firstIndex(where: { $0.id == voucherId }) else { return nil }
+        return VetSession(voucher: pending[idx], queueIndex: idx + 1, queueTotal: pending.count)
+    }
+
+    static func session(at index: Int, in vouchers: [DetectionVoucher]) -> VetSession? {
+        let pending = orderedPending(vouchers)
+        guard index >= 0, index < pending.count else { return nil }
+        return VetSession(voucher: pending[index], queueIndex: index + 1, queueTotal: pending.count)
+    }
+
+    /// After a vet decision, return the next analyst session or nil when the queue is empty.
+    static func advanceAfterDecision(
+        vouchers: [DetectionVoucher],
+        decidedId: String,
+        decision: VetStatus
+    ) -> VetSession? {
+        let pending = orderedPending(vouchers)
+        guard !pending.isEmpty else { return nil }
+        switch decision {
+        case .confirmed, .rejected:
+            return session(at: 0, in: vouchers)
+        case .needsReview:
+            guard let idx = pending.firstIndex(where: { $0.id == decidedId }) else {
+                return session(at: 0, in: vouchers)
+            }
+            if pending.count == 1 { return session(for: decidedId, in: vouchers) }
+            return session(at: (idx + 1) % pending.count, in: vouchers)
+        case .autoAccepted:
+            return session(at: 0, in: vouchers)
+        }
     }
 }
 

@@ -960,7 +960,10 @@ struct PlayingFieldOverlay: View {
                         richness: model.speciesRichness,
                         noiseBudgetPct: model.noiseBudgetPct,
                         deploymentId: model.deploymentId,
-                        transectMode: model.transectMode
+                        siteLabel: model.siteLabel,
+                        recorderProfile: model.recorderProfile,
+                        transectMode: model.transectMode,
+                        vetBacklogCount: model.vetBacklogCount
                     )
                     .padding(.horizontal, 16)
                     .padding(.top, 52)
@@ -1045,9 +1048,15 @@ private struct VetAnalystPanel: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Analyst vet")
-                .font(SwarmTheme.ui(10, .bold))
-                .foregroundColor(SwarmTheme.lime.opacity(0.85))
+            HStack {
+                Text("Analyst vet")
+                    .font(SwarmTheme.ui(10, .bold))
+                    .foregroundColor(SwarmTheme.lime.opacity(0.85))
+                Spacer()
+                Text(session.queueLabel)
+                    .font(SwarmTheme.ui(10, .bold))
+                    .foregroundColor(SwarmTheme.cyan.opacity(0.85))
+            }
             VStack(alignment: .leading, spacing: 2) {
                 Text(session.commonName)
                     .font(SwarmTheme.ui(14, .bold))
@@ -1126,7 +1135,10 @@ private struct MissionBriefCard: View {
     let richness: Int
     let noiseBudgetPct: Int
     let deploymentId: String?
+    let siteLabel: String?
+    let recorderProfile: String?
     let transectMode: TransectMode
+    let vetBacklogCount: Int
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -1149,6 +1161,11 @@ private struct MissionBriefCard: View {
                     .font(SwarmTheme.ui(9, .medium))
                     .foregroundColor(SwarmTheme.foam.opacity(0.35))
             }
+            if let siteLabel, let recorderProfile {
+                Text("\(siteLabel) · \(recorderProfile)")
+                    .font(SwarmTheme.ui(10, .semibold))
+                    .foregroundColor(SwarmTheme.cyan.opacity(0.8))
+            }
             Text(mission.title)
                 .font(SwarmTheme.ui(14, .bold))
                 .foregroundColor(SwarmTheme.foam)
@@ -1160,6 +1177,9 @@ private struct MissionBriefCard: View {
                 briefStat("\(detections)/\(mission.targetDetections)", "detections")
                 briefStat("\(richness)/\(mission.targetRichness)", "species")
                 briefStat("\(noiseBudgetPct)%", "noise budget")
+                if vetBacklogCount > 0 {
+                    briefStat("\(vetBacklogCount)", SurveyProtocolCopy.analystBacklogLabel.lowercased())
+                }
             }
             .padding(.top, 2)
             if GameSettings.traineeMode {

@@ -21,4 +21,7 @@ enum SurveyProtocolCopy {
     static let presenceInsufficient = "Insufficient evidence"
     static let conservativeClassifier = "+1 Conservative classifier"
     static let presenceAbsenceHeader = "Presence / absence"
+    static let presenceAbsenceNightCard = "Presence / absence — night card"
+    static let presenceAbsenceNightCardCSVHeader = "presence_absence_night_card"
+    static let analystBacklogLabel = "Analyst backlog"
 }

@@ -40,6 +40,8 @@ final class GameModel: ObservableObject {
     @Published var habitatSite: HabitatSite = .canopy
     @Published var transectMode: TransectMode = .fieldDay
     @Published var deploymentId: String?
+    @Published var siteLabel: String?
+    @Published var recorderProfile: String?
     @Published var passiveBatMode: Bool = false
     @Published var fieldOverlayHint: String?
     @Published var spectrogram: SpectrogramSnapshot?
@@ -50,6 +52,7 @@ final class GameModel: ObservableObject {
     @Published var surveyScoreBest: Bool = false
     @Published var recentVouchers: [DetectionVoucher] = []
     @Published var vetSession: VetSession?
+    @Published var vetBacklogCount: Int = 0
 
     let meta: MetaStore
     let catalog: SpeciesCatalogStore
@@ -132,7 +135,10 @@ final class GameModel: ObservableObject {
         noiseBudgetPct = 100
         recentVouchers = []
         vetSession = nil
+        vetBacklogCount = 0
         deploymentId = nil
+        siteLabel = nil
+        recorderProfile = nil
         passiveBatMode = false
         fieldOverlayHint = nil
         onStart()

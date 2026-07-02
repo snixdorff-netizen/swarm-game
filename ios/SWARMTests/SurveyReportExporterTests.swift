@@ -46,7 +46,8 @@ final class SurveyReportExporterTests: XCTestCase {
         let text = SurveyReportExporter.textReport(sampleReport(), deployMode: .sm5)
         XCTAssertTrue(text.contains("Dawn Chorus Baseline"))
         XCTAssertTrue(text.contains("Wood Thrush"))
-        XCTAssertTrue(text.contains(SurveyProtocolCopy.presenceAbsenceHeader))
+        XCTAssertTrue(text.contains(SurveyProtocolCopy.presenceAbsenceNightCard))
+        XCTAssertTrue(text.contains("validated: 1"))
         XCTAssertTrue(text.contains("Survey score: 880"))
         XCTAssertTrue(text.contains("SM5"))
     }
@@ -59,5 +60,12 @@ final class SurveyReportExporterTests: XCTestCase {
         XCTAssertTrue(csv.contains("DEP-00001039"))
         XCTAssertTrue(csv.contains("SWARM_wood_thrush"))
         XCTAssertTrue(csv.contains("auto_id,manual_id,vet_status"))
+        XCTAssertTrue(csv.contains(SurveyProtocolCopy.presenceAbsenceNightCardCSVHeader))
+        XCTAssertTrue(csv.contains("presence_status,validated_passes,tentative_passes,rejected_passes"))
+        let voucherHeaderRange = csv.range(of: "species_id,common_name,scientific_name,confidence")
+        let nightCardRange = csv.range(of: SurveyProtocolCopy.presenceAbsenceNightCardCSVHeader)
+        XCTAssertNotNil(voucherHeaderRange)
+        XCTAssertNotNil(nightCardRange)
+        XCTAssertGreaterThan(nightCardRange!.lowerBound, voucherHeaderRange!.lowerBound)
     }
 }

@@ -21,13 +21,14 @@ enum SurveyReportExporter {
             "  Mean confidence: \(Int(report.meanConfidence * 100))%",
             "  False positives: \(report.falsePositives)",
             "",
-            SurveyProtocolCopy.presenceAbsenceHeader,
+            SurveyProtocolCopy.presenceAbsenceNightCard,
         ]
         if report.presenceRecords.isEmpty {
             lines.append("  (none)")
         } else {
             for record in report.presenceRecords {
                 lines.append("  \(record.summaryLine)")
+                lines.append("    validated: \(record.validatedPasses) · tentative: \(record.tentativePasses) · rejected: \(record.rejectedPasses)")
             }
         }
         lines.append("")
@@ -57,6 +58,16 @@ enum SurveyReportExporter {
                 String(format: "%.2f", v.confidence), "\(v.timeSec)",
                 csv(v.vetStatus.autoIdColumn), csv(v.vetStatus.manualIdColumn), csv(v.vetStatus.rawValue),
                 csv(v.deploymentId), csv(v.siteLabel), csv(v.recorderProfile), csv(v.clipFilename),
+            ].joined(separator: ","))
+        }
+        rows.append("")
+        rows.append(SurveyProtocolCopy.presenceAbsenceNightCardCSVHeader)
+        rows.append("species_id,common_name,scientific_name,presence_status,validated_passes,tentative_passes,rejected_passes,mean_confidence")
+        for record in report.presenceRecords {
+            rows.append([
+                csv(record.speciesId), csv(record.commonName), csv(record.scientificName),
+                csv(record.status.rawValue), "\(record.validatedPasses)", "\(record.tentativePasses)",
+                "\(record.rejectedPasses)", String(format: "%.2f", record.meanConfidence),
             ].joined(separator: ","))
         }
         return rows.joined(separator: "\n")
