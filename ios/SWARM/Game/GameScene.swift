@@ -2,7 +2,7 @@
 // move your Song Meter rig, auto-classifiers scan hidden fauna, confirmed IDs drop recording clips,
 // rank up to choose field kit modules. Habitat disturbance ends the deployment.
 //
-// Fauna are faint until within acoustic detection range. Flat geometry — no art assets required.
+// Fauna are faint until within acoustic detection range. SpriteKit textures from Assets.xcassets.
 
 import SpriteKit
 
@@ -84,7 +84,8 @@ final class GameScene: SKScene {
     weak var model: GameModel?
 
     // Player
-    private var player = SKShapeNode()
+    private var player = SKSpriteNode()
+    private var fieldBg = SKSpriteNode()
     private var pPos = CGPoint.zero
     private var moveDir = CGVector.zero          // normalized * magnitude (0…1)
     private var hp: CGFloat = 100
@@ -179,6 +180,7 @@ final class GameScene: SKScene {
         backgroundColor = C.bg
         scaleMode = .resizeFill
         addChild(cam); camera = cam
+        buildFieldBackground()
         buildGrid()
         buildPlayer()
         buildHUD()
@@ -201,6 +203,15 @@ final class GameScene: SKScene {
                 self?.playerInvulnerable = true
             }
         }
+    }
+
+    private func buildFieldBackground() {
+        fieldBg.removeFromParent()
+        let tex = SwarmTextures.fieldBackgroundTexture
+        fieldBg = SKSpriteNode(texture: tex, color: .clear, size: CGSize(width: 2800, height: 2800))
+        fieldBg.alpha = 0.42
+        fieldBg.zPosition = -12
+        addChild(fieldBg)
     }
 
     private func buildGrid() {
@@ -230,20 +241,10 @@ final class GameScene: SKScene {
     }
 
     private func buildPlayer() {
-        let r: CGFloat = 13
-        player = SKShapeNode(rectOf: CGSize(width: r * 2.4, height: r * 1.7), cornerRadius: 4)
-        player.fillColor = C.player
-        player.strokeColor = .white
-        player.lineWidth = 1.5
-        player.glowWidth = 3
+        let tex = SwarmTextures.songMeterTexture
+        player = SKSpriteNode(texture: tex, color: .clear, size: CGSize(width: 52, height: 52))
         player.zPosition = 5
         addChild(player)
-        let mic = SKShapeNode(circleOfRadius: 3.5)
-        mic.fillColor = .white
-        mic.strokeColor = .clear
-        mic.position = CGPoint(x: 0, y: r * 0.35)
-        mic.zPosition = 1
-        player.addChild(mic)
         novaRing = SKShapeNode(circleOfRadius: novaRadius)
         novaRing.strokeColor = C.orbit.withAlphaComponent(0.0)
         novaRing.lineWidth = 2; novaRing.zPosition = 3
@@ -610,9 +611,10 @@ final class GameScene: SKScene {
         case .boss: color = C.boss; sz = 64
         default: break
         }
-        let node = SKSpriteNode(color: color, size: CGSize(width: sz, height: sz))
-        node.position = pos; node.zRotation = kind == .shooter ? 0 : .pi/4; node.zPosition = kind == .boss ? 6 : 2
-        node.alpha = 0.12
+        let node = SKSpriteNode(texture: SwarmTextures.vocalizationTexture, color: color, size: CGSize(width: sz, height: sz))
+        node.colorBlendFactor = 0.38
+        node.position = pos; node.zRotation = 0; node.zPosition = kind == .boss ? 6 : 2
+        node.alpha = 0.14
         addChild(node)
         let ring = SKShapeNode(circleOfRadius: stats.radius + 10)
         ring.strokeColor = color.withAlphaComponent(0.45)
@@ -658,8 +660,9 @@ final class GameScene: SKScene {
         let dist = max(size.width, size.height) * 0.5
         let pos = CGPoint(x: pPos.x + cos(ang) * dist, y: pPos.y + sin(ang) * dist)
         let stats = BalanceEngine.enemyStats(kind: .boss, runTime: runTime)
-        let node = SKSpriteNode(color: C.boss, size: CGSize(width: 64, height: 64))
-        node.position = pos; node.zRotation = .pi/4; node.zPosition = 6
+        let node = SKSpriteNode(texture: SwarmTextures.vocalizationTexture, color: C.boss, size: CGSize(width: 72, height: 72))
+        node.colorBlendFactor = 0.45
+        node.position = pos; node.zRotation = 0; node.zPosition = 6
         addChild(node)
         let bat = deployMode == .sm5bat
             ? ProjectSpeciesCatalog.with(id: "hoary_bat")!
@@ -1072,14 +1075,12 @@ final class GameScene: SKScene {
         }
     }
     private func archiveRecordingClip(at p: CGPoint, value: CGFloat) {
-        let bar = SKShapeNode(rectOf: CGSize(width: 14, height: 3), cornerRadius: 1)
-        bar.fillColor = C.clarity
-        bar.strokeColor = C.clarity.withAlphaComponent(0.45)
-        bar.position = p
-        bar.zPosition = 2
-        addChild(bar)
-        bar.run(.sequence([
-            .group([.moveBy(x: 0, y: 14, duration: 0.38), .fadeOut(withDuration: 0.38)]),
+        let clip = SKSpriteNode(texture: SwarmTextures.recordingClipTexture, color: .clear, size: CGSize(width: 30, height: 30))
+        clip.position = p
+        clip.zPosition = 2
+        addChild(clip)
+        clip.run(.sequence([
+            .group([.moveBy(x: 0, y: 18, duration: 0.38), .fadeOut(withDuration: 0.38)]),
             .removeFromParent(),
         ]))
         let xpValue = value * fieldProfile.surveyXpMult

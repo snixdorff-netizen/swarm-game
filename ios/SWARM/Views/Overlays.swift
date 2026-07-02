@@ -39,7 +39,13 @@ struct MenuOverlay: View {
 
     var body: some View {
         ZStack {
-            SwarmTheme.bg.opacity(0.88).ignoresSafeArea()
+            SwarmTheme.bg.ignoresSafeArea()
+            Image(SwarmTextures.fieldBackground)
+                .resizable()
+                .scaledToFill()
+                .opacity(0.28)
+                .ignoresSafeArea()
+            SwarmTheme.bg.opacity(0.72).ignoresSafeArea()
             VStack(spacing: 10) {
                 HStack {
                     Spacer()
@@ -55,6 +61,11 @@ struct MenuOverlay: View {
                 .padding(.top, 8)
 
                 Spacer()
+                Image(SwarmTextures.songMeter)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 88, height: 88)
+                    .shadow(color: SwarmTheme.cyan.opacity(0.55), radius: 14)
                 Text("SWARM")
                     .font(SwarmTheme.title(76)).foregroundColor(SwarmTheme.cyan)
                     .tracking(6)

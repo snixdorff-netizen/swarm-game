@@ -18,6 +18,11 @@ struct DeathShareCardView: View {
     var body: some View {
         ZStack {
             SwarmTheme.bg
+            Image(SwarmTextures.fieldBackground)
+                .resizable()
+                .scaledToFill()
+                .opacity(0.35)
+                .clipped()
             VStack(spacing: 18) {
                 Text("SWARM")
                     .font(SwarmTheme.title(44))
